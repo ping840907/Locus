@@ -324,7 +324,7 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
 
   // Status / debug line pushed from the phone.
   Tuple *status_t = dict_find(iter, MESSAGE_KEY_STATUS);
-  if (status_t && status_t->value->cstring) {
+  if (status_t && status_t->length > 0) {
     set_status(status_t->value->cstring);
     return;
   }
