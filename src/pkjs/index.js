@@ -223,19 +223,37 @@ function rememberFetch(settings, loc, size) {
 
 function downloadAndSend(settings, loc, size) {
   var url = buildMapUrl(settings, loc, size);
+  // Log the full URL so it can be tested directly in a browser / curl.
+  console.log('Requesting map: ' + url);
+  sendStatus('GET map...');
+
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
   xhr.responseType = 'arraybuffer';
+  xhr.timeout = 30000;
+
   xhr.onload = function () {
+    var len = 0;
+    try { len = xhr.response ? new Uint8Array(xhr.response).byteLength : 0; }
+    catch (e) { len = -1; }
+    console.log('Map response: HTTP ' + xhr.status + ', ' + len + ' bytes');
+
     if (xhr.status !== 200) {
-      sendStatus('Map HTTP ' + xhr.status);
+      sendStatus('HTTP ' + xhr.status);
       sending = false;
       return;
     }
+    if (len <= 0) {
+      // 200 but no binary body: arraybuffer not honoured by this JS runtime.
+      sendStatus('Empty body n=' + len);
+      sending = false;
+      return;
+    }
+
     var bytes = new Uint8Array(xhr.response);
-    console.log('Map downloaded: ' + bytes.length + ' bytes');
-    // The watch shows "Loading map..." on IMG_SIZE and clears it on a
-    // successful decode, so we do not send a status during the stream itself.
+    // Show the HTTP result briefly; the watch then shows "Loading map..." on
+    // IMG_SIZE and clears it on a successful decode.
+    sendStatus('H200 n=' + bytes.length);
     streamImage(bytes, function (ok) {
       sending = false;
       if (ok) {
@@ -246,10 +264,23 @@ function downloadAndSend(settings, loc, size) {
     });
   };
   xhr.onerror = function () {
-    sendStatus('Network error');
+    console.log('Map request network error (status ' + xhr.status + ')');
+    sendStatus('Net err s=' + xhr.status);
     sending = false;
   };
-  xhr.send();
+  xhr.ontimeout = function () {
+    console.log('Map request timed out');
+    sendStatus('Map timeout');
+    sending = false;
+  };
+
+  try {
+    xhr.send();
+  } catch (e) {
+    console.log('xhr.send threw: ' + e);
+    sendStatus('Send threw');
+    sending = false;
+  }
 }
 
 function streamImage(bytes, done) {
