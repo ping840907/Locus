@@ -13,7 +13,11 @@ var Clay = require('@rebble/clay');
 var clayConfig = require('./config');
 var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 
-var SETTINGS_KEY = 'mapface-settings';
+// Clay's getSettings() writes a clean, name-keyed, flattened copy of the
+// settings here (e.g. { API_KEY: "...", ZOOM: 15 }). The dict it *returns* is
+// keyed by numeric message-key IDs for sendAppMessage, so we must read our
+// own settings from this localStorage entry, not from that dict.
+var CLAY_SETTINGS_KEY = 'clay-settings';
 var LAST_FETCH_KEY = 'mapface-lastfetch';
 var CHUNK_SIZE = 1000; // bytes of image data per AppMessage
 
@@ -49,38 +53,22 @@ function defaultSettings() {
 }
 
 function loadSettings() {
+  var base = defaultSettings();
   try {
-    var raw = localStorage.getItem(SETTINGS_KEY);
+    var raw = localStorage.getItem(CLAY_SETTINGS_KEY);
     if (raw) {
       var parsed = JSON.parse(raw);
-      var base = defaultSettings();
       for (var k in parsed) {
-        if (parsed.hasOwnProperty(k)) { base[k] = parsed[k]; }
+        if (parsed.hasOwnProperty(k) && parsed[k] !== null &&
+            parsed[k] !== undefined) {
+          base[k] = parsed[k];
+        }
       }
-      return base;
     }
   } catch (e) {
     console.log('Failed to load settings: ' + e);
   }
-  return defaultSettings();
-}
-
-function saveSettings(dict) {
-  var s = {
-    API_KEY: dict.API_KEY,
-    LOCATION_MODE: dict.LOCATION_MODE,
-    FIXED_LAT: dict.FIXED_LAT,
-    FIXED_LON: dict.FIXED_LON,
-    UPDATE_DISTANCE: dict.UPDATE_DISTANCE,
-    ZOOM: dict.ZOOM,
-    SHOW_LABELS: dict.SHOW_LABELS,
-    MAP_STYLE: dict.MAP_STYLE
-  };
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  } catch (e) {
-    console.log('Failed to save settings: ' + e);
-  }
+  return base;
 }
 
 function getPlatformSize() {
@@ -365,19 +353,19 @@ Pebble.addEventListener('webviewclosed', function (e) {
 
   var dict;
   try {
-    dict = clay.getSettings(e.response); // converted, ready for AppMessage
+    // getSettings also writes the clean, name-keyed copy to clay-settings.
+    dict = clay.getSettings(e.response); // numeric-keyed dict for AppMessage
   } catch (err) {
     console.log('getSettings error: ' + err);
     sendStatus('Cfg parse err');
     return;
   }
 
-  console.log('Config dict: ' + JSON.stringify(dict));
-  var keyLen = (dict && dict.API_KEY) ? String(dict.API_KEY).length : 0;
-
-  saveSettings(dict);
   sendConfigToWatch(dict);
 
+  // Read our own settings (API key, mode, etc.) from the clean copy.
+  var settings = loadSettings();
+  var keyLen = settings.API_KEY ? String(settings.API_KEY).length : 0;
   if (!keyLen) {
     // The form returned but the API key field came back empty.
     sendStatus('Cfg: key empty');
