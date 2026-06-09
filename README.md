@@ -42,14 +42,16 @@ Pebble cannot fetch or process map imagery itself, so the work is split:
   when "Show place / road names" is off.
 * **Conversion** — Geoapify returns a 24-bit truecolor PNG, which Pebble's
   `gbitmap_create_from_png_data` cannot decode (it only supports palettized /
-  greyscale PNG). The phone therefore decodes the PNG and re-encodes it as a
-  16-colour **indexed PNG** (`upng-js` + `pako`, pure JS — no canvas needed)
-  before sending it.
-* **Transfer** — the indexed PNG bytes are streamed to the watch over
-  AppMessage (ACK-driven, ~1 KB per message), reassembled into a buffer, and
-  decoded with `gbitmap_create_from_png_data`.
-* **Refresh cadence** — the watch asks the phone for an update at the top of
-  every hour (and on launch / whenever settings are saved). The phone only
+  greyscale PNG). The phone decodes it, reduces every pixel to one of four
+  brightness levels, paints each level with the user's **Map colours**, and
+  re-encodes a 2-bit (4-colour) **indexed PNG** (`upng-js` + `pako`, pure JS —
+  no canvas needed) before sending it.
+* **Transfer** — every outbound AppMessage (status, config, image chunks) goes
+  through one serialised queue so nothing overlaps; the indexed PNG is streamed
+  ~1 KB at a time, reassembled, signature-checked, and decoded with
+  `gbitmap_create_from_png_data` (with a bounded auto-retry on corruption).
+* **Refresh cadence** — the watch asks the phone for an update on a configurable
+  interval (and on launch / whenever settings are saved). The phone only
   re-downloads the map if you have moved beyond the configured distance.
 
 ### On-watch status line
@@ -131,8 +133,9 @@ requests/day on the free tier). The map appears once a location is resolved.
 | **Location check interval** | How often the watch checks your location, 15–360 min (default 60). |
 | **Refresh distance (m)** | Re-download the map only after moving this far (50–5000 m). |
 | **Zoom level** | Map zoom (10–18). |
-| **Map style** | `dark-matter` and other dark variants, plus light/grey styles. |
+| **Map detail** | Standard / dimmer / brighter roads (dark base styles). |
 | **Show place / road names** | Toggle map labels (local-language). |
+| **Map colours** | Recolour the map's 4 brightness levels (background → highlights). |
 | **Time / Date / Background colour** | Watchface overlay colours. |
 | **Show date** | Toggle the date line. |
 | **Show location dot** | Toggle the centre marker. |
@@ -141,12 +144,12 @@ requests/day on the free tier). The map appears once a location is resolved.
 
 ## Notes & limitations
 
-* **Memory.** Decoding a screen-sized PNG on the watch is memory intensive.
-  It works best on the higher-memory colour platforms (basalt, chalk, diorite,
-  emery, flint, gabbro). On **aplite** (24 KB app RAM) the decode may fail; the
-  watchface then gracefully falls back to the background colour plus the
-  time/date overlay. Map images compress well because the dark style uses very
-  few colours.
+* **Colours & memory.** The phone reduces the map to four brightness levels and
+  paints them with the user's **Map colours**, producing a 2-bit (4-colour)
+  indexed PNG. This is tiny to transfer and decodes into a small palettized
+  bitmap, so it fits comfortably even on emery's large screen (and changing a
+  colour just re-fetches and re-bakes — no watch-side palette code). The old
+  bitmap is freed before the new one is decoded to avoid holding two at once.
 * **Hiding labels** is done by disabling every text (symbol) layer of the
   chosen style. Because layer ids differ per style, the app fetches the style's
   JSON once (cached) and builds the `styleCustomization` list from its symbol
@@ -156,8 +159,10 @@ requests/day on the free tier). The map appears once a location is resolved.
   watch so the band is off-screen while the location stays centred. Note that
   the Geoapify free tier expects attribution to remain visible — keep this in
   mind for any public distribution.
-* **Road visibility.** A gamma curve brightens the dark style's dim grey roads
-  before the image is quantised, so the road network reads clearly on-screen.
+* **Road visibility.** A gamma curve lifts dark tones before the map is bucketed
+  into brightness levels, so dim roads land in a visible level instead of the
+  background. Adjust the level thresholds (`LEVEL_THRESHOLDS`) in `index.js` to
+  taste.
 * Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
   (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
   actual resolution differs).

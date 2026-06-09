@@ -18,10 +18,9 @@ var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 // gbitmap_create_from_png_data() can decode.
 var UPNG = require('upng-js');
 
-// Number of palette colours for the re-encoded image. 16 colours => a 4-bit
-// indexed PNG: small to transfer and cheap for the watch to decode, while
-// still plenty for a monochrome dark map.
-var NUM_COLORS = 16;
+// The Geoapify map is reduced to 4 brightness levels and recoloured with the
+// user's palette, producing a 2-bit (4-colour) indexed PNG: tiny to transfer
+// and very cheap for the watch to decode.
 
 // Geoapify burns a (two-line) attribution band onto the bottom of the static
 // map. We request the image this many extra pixels taller on each side; the
@@ -29,8 +28,9 @@ var NUM_COLORS = 16;
 // bottom edge while the location stays centred. Must exceed the band height.
 var ATTR_CROP = 60;
 
-// Gamma < 1 brightens dark tones so dark-matter's dim grey roads become
-// clearly visible against the black background (and survive quantisation).
+// Gamma < 1 lifts dark tones before bucketing so the dark styles' dim grey
+// roads land in a visible brightness level rather than collapsing into the
+// background.
 var GAMMA = 0.5;
 var GAMMA_LUT = (function () {
   var lut = new Uint8Array(256);
@@ -39,6 +39,13 @@ var GAMMA_LUT = (function () {
   }
   return lut;
 })();
+
+// Luminance thresholds (after gamma) that split a pixel into one of 4 levels:
+// 0 = background (darkest) ... 3 = highlights (brightest).
+var LEVEL_THRESHOLDS = [40, 110, 190];
+
+// Default map palette (a monochrome ramp matching the classic dark look).
+var DEFAULT_MAP_COLORS = [0x000000, 0x555555, 0xAAAAAA, 0xFFFFFF];
 
 // Clay's getSettings() writes a clean, name-keyed, flattened copy of the
 // settings here (e.g. { API_KEY: "...", ZOOM: 15 }). The dict it *returns* is
@@ -107,13 +114,6 @@ var PLATFORM_SIZES = {
   gabbro:  { w: 260, h: 260 } // round screen
 };
 
-// Palette size for the re-encoded indexed PNG, per platform. The on-watch
-// decode footprint scales sharply with this: >16 colours forces an 8-bit
-// image, doubling the decoded bitmap and uPNG work buffers. 16 colours (a
-// compact 4-bit PNG) keeps the decode well within RAM even on emery's large
-// screen, and is plenty for the near-monochrome dark map.
-var PLATFORM_COLORS = {};
-
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
@@ -127,7 +127,11 @@ function defaultSettings() {
     UPDATE_DISTANCE: 500,
     ZOOM: 15,
     SHOW_LABELS: 1,
-    MAP_STYLE: 'dark-matter'
+    MAP_STYLE: 'dark-matter',
+    MAP_COLOR_BG: DEFAULT_MAP_COLORS[0],
+    MAP_COLOR_1: DEFAULT_MAP_COLORS[1],
+    MAP_COLOR_2: DEFAULT_MAP_COLORS[2],
+    MAP_COLOR_3: DEFAULT_MAP_COLORS[3]
   };
 }
 
@@ -164,8 +168,14 @@ function getPlatformSize(platform) {
   return { w: s.w, h: s.h + 2 * ATTR_CROP };
 }
 
-function getNumColors(platform) {
-  return PLATFORM_COLORS[platform] || NUM_COLORS;
+// Build the 4-entry [r,g,b] palette from the user's map colour settings.
+function getMapPalette(settings) {
+  var keys = ['MAP_COLOR_BG', 'MAP_COLOR_1', 'MAP_COLOR_2', 'MAP_COLOR_3'];
+  return keys.map(function (k, i) {
+    var v = settings[k];
+    if (typeof v !== 'number') { v = DEFAULT_MAP_COLORS[i]; }
+    return { r: (v >> 16) & 0xFF, g: (v >> 8) & 0xFF, b: v & 0xFF };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -358,30 +368,32 @@ function rememberFetch(settings, loc, size) {
 }
 
 // ---------------------------------------------------------------------------
-// PNG conversion (truecolor -> indexed, so the watch can decode it)
+// PNG conversion: reduce the Geoapify map to 4 brightness levels and paint
+// each level with the user's palette colour, producing a 2-bit indexed PNG
+// the watch can decode cheaply.
 // ---------------------------------------------------------------------------
 
-function toIndexedPng(arrayBuffer, numColors, brighten) {
+function recolorToPalette(arrayBuffer, palette) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var w = decoded.width, h = decoded.height;
   console.log('Geoapify returned ' + w + 'x' + h);
-  var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
+  var px = new Uint8Array(UPNG.toRGBA8(decoded)[0]); // first frame, RGBA bytes
 
-  // Brighten dark tones (in place) so the dim grey roads of the dark styles
-  // stand out before quantisation. Skipped for light styles, which would
-  // otherwise wash out. The attribution band at the bottom edge is hidden by
-  // the watch shifting the image off the bottom of the screen.
-  if (brighten) {
-    var px = new Uint8Array(rgba);
-    for (var i = 0; i < px.length; i += 4) {
-      px[i] = GAMMA_LUT[px[i]];
-      px[i + 1] = GAMMA_LUT[px[i + 1]];
-      px[i + 2] = GAMMA_LUT[px[i + 2]];
-    }
+  for (var i = 0; i < px.length; i += 4) {
+    // Perceptual luminance, then gamma-lift so dim roads aren't lost.
+    var lum = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8; // 0..255
+    lum = GAMMA_LUT[lum];
+    var level = 0;
+    if (lum >= LEVEL_THRESHOLDS[2]) { level = 3; }
+    else if (lum >= LEVEL_THRESHOLDS[1]) { level = 2; }
+    else if (lum >= LEVEL_THRESHOLDS[0]) { level = 1; }
+    var c = palette[level];
+    px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b; px[i + 3] = 255;
   }
 
-  // Re-encode with a small palette -> low-bit-depth indexed PNG.
-  var out = UPNG.encode([rgba], w, h, numColors || NUM_COLORS);
+  // The image now contains at most 4 distinct colours, so UPNG emits a 2-bit
+  // (4-colour) indexed PNG whose palette is exactly the user's colours.
+  var out = UPNG.encode([px.buffer], w, h, 4);
   return new Uint8Array(out);
 }
 
@@ -389,7 +401,7 @@ function toIndexedPng(arrayBuffer, numColors, brighten) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, labelCustomization, numColors, brighten) {
+function downloadAndSend(settings, loc, size, labelCustomization, palette) {
   var url = buildMapUrl(settings, loc, size, labelCustomization);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
@@ -417,11 +429,11 @@ function downloadAndSend(settings, loc, size, labelCustomization, numColors, bri
       return;
     }
 
-    // Geoapify returns a truecolor PNG; convert it to an indexed PNG that the
-    // watch can actually decode.
+    // Reduce to 4 brightness levels and recolour with the user's palette,
+    // producing a small 2-bit indexed PNG the watch can decode.
     var bytes;
     try {
-      bytes = toIndexedPng(xhr.response, numColors, brighten);
+      bytes = recolorToPalette(xhr.response, palette);
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
@@ -499,11 +511,8 @@ function performUpdate(force) {
 
   var platform = getPlatform();
   var size = getPlatformSize(platform);
-  var numColors = getNumColors(platform);
-  // Only brighten the dark map styles; light styles would wash out.
-  var brighten = (settings.MAP_STYLE || 'dark-matter').indexOf('dark-matter') === 0;
-  console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h +
-              ', ' + numColors + ' colours, brighten=' + brighten);
+  var palette = getMapPalette(settings);
+  console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h);
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
     if (err) { sendStatus('No location'); finishSending(); return; }
@@ -513,7 +522,7 @@ function performUpdate(force) {
       return;
     }
     resolveLabelCustomization(settings, function (labelCustomization) {
-      downloadAndSend(settings, loc, size, labelCustomization, numColors, brighten);
+      downloadAndSend(settings, loc, size, labelCustomization, palette);
     });
   });
 }

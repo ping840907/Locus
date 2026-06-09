@@ -137,17 +137,12 @@ module.exports = [
       {
         "type": "select",
         "messageKey": "MAP_STYLE",
-        "label": "Map style",
+        "label": "Map detail",
         "defaultValue": "dark-matter",
         "options": [
-          { "label": "Dark (black bg, grey roads)", "value": "dark-matter" },
-          { "label": "Dark – brown roads", "value": "dark-matter-brown" },
-          { "label": "Dark – dark grey", "value": "dark-matter-dark-grey" },
-          { "label": "Dark – purple roads", "value": "dark-matter-purple-roads" },
-          { "label": "Dark – yellow roads", "value": "dark-matter-yellow-roads" },
-          { "label": "Light – Positron", "value": "positron" },
-          { "label": "Light – grey", "value": "osm-bright-grey" },
-          { "label": "Toner (grey)", "value": "toner-grey" }
+          { "label": "Standard", "value": "dark-matter" },
+          { "label": "Dimmer roads", "value": "dark-matter-dark-grey" },
+          { "label": "Brighter roads", "value": "dark-matter-yellow-roads" }
         ]
       },
       {
@@ -158,7 +153,50 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Map names are shown in the map's own local language."
+        "defaultValue": "The map is reduced to four brightness levels and recoloured with the palette below. Names are shown in the map's own local language."
+      }
+    ]
+  },
+
+  // -------------------------------------------------------------------------
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Map colours"
+      },
+      {
+        "type": "text",
+        "defaultValue": "Colour the four brightness levels of the map, from background (darkest) to highlights (brightest)."
+      },
+      {
+        "type": "color",
+        "messageKey": "MAP_COLOR_BG",
+        "label": "Background",
+        "defaultValue": "000000",
+        "sunlight": true
+      },
+      {
+        "type": "color",
+        "messageKey": "MAP_COLOR_1",
+        "label": "Minor roads / areas",
+        "defaultValue": "555555",
+        "sunlight": true
+      },
+      {
+        "type": "color",
+        "messageKey": "MAP_COLOR_2",
+        "label": "Main roads",
+        "defaultValue": "AAAAAA",
+        "sunlight": true
+      },
+      {
+        "type": "color",
+        "messageKey": "MAP_COLOR_3",
+        "label": "Highlights / labels",
+        "defaultValue": "FFFFFF",
+        "sunlight": true
       }
     ]
   },
