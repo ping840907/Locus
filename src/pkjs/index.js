@@ -23,11 +23,11 @@ var UPNG = require('upng-js');
 // still plenty for a monochrome dark map.
 var NUM_COLORS = 16;
 
-// Geoapify burns an attribution band onto the bottom of the static map. We
-// request the image this many extra pixels taller on each side and let the
-// watch centre-crop it, so the bottom band is clipped off-screen while the
-// location stays centred. (Enough to cover a two-line attribution.)
-var ATTR_CROP = 40;
+// Geoapify burns a (two-line) attribution band onto the bottom of the static
+// map. We request the image this many extra pixels taller on each side; the
+// watch shifts the image up by the same amount so the band is pushed off the
+// bottom edge while the location stays centred. Must exceed the band height.
+var ATTR_CROP = 60;
 
 // Gamma < 1 brightens dark tones so dark-matter's dim grey roads become
 // clearly visible against the black background (and survive quantisation).

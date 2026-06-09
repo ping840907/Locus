@@ -103,16 +103,15 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, s_bg_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
-  // Map background. The Geoapify attribution band is baked onto the bottom
-  // edge of the returned image. We draw the image shifted so that its bottom
-  // edge is pushed ATTR_PUSH pixels below the screen's bottom edge, so the
-  // attribution falls outside the visible area. When the image is taller than
-  // the screen (Geoapify honoured our oversized request) this also keeps most
-  // of the map visible; when it isn't, a small strip of background appears at
-  // the top instead of the attribution at the bottom.
+  // Map background. The Geoapify attribution band (two lines) is baked onto
+  // the bottom edge of the returned image, which we request taller than the
+  // screen. We shift the image up by ATTR_PUSH so its bottom edge (with the
+  // attribution) is pushed past the screen's bottom edge. ATTR_PUSH matches
+  // the per-side extra height requested by the phone, so the location (image
+  // centre) ends up at the screen centre.
   GPoint loc_point = grect_center_point(&bounds);
   if (s_map_bitmap) {
-    const int ATTR_PUSH = 28;
+    const int ATTR_PUSH = 60;
     GRect img = gbitmap_get_bounds(s_map_bitmap);
     int origin_x = bounds.origin.x + (bounds.size.w - img.size.w) / 2;
     int origin_y = bounds.origin.y + bounds.size.h + ATTR_PUSH - img.size.h;
@@ -242,11 +241,7 @@ static void finalize_image(void) {
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
-    // Temporary: report the decoded image height so we can tell whether
-    // Geoapify honoured the oversized (attribution-cropping) request.
-    GRect mb = gbitmap_get_bounds(new_bitmap);
-    snprintf(dbg, sizeof(dbg), "img %dx%d", mb.size.w, mb.size.h);
-    set_status(dbg);
+    set_status(""); // success: clear status for a clean face
   } else {
     // Decode failed: surface the header bytes so we can tell why.
     if (new_bitmap) {
