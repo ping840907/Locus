@@ -304,21 +304,37 @@ function rememberFetch(settings, loc, size) {
 // PNG conversion (truecolor -> indexed, so the watch can decode it)
 // ---------------------------------------------------------------------------
 
+// Height (px) of the Geoapify attribution band painted onto the bottom edge.
+var ATTR_BAND_PX = 28;
+
 function toIndexedPng(arrayBuffer, numColors) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
+  var w = decoded.width, h = decoded.height;
+  console.log('Geoapify returned ' + w + 'x' + h);
   var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
+  var px = new Uint8Array(rgba);
 
   // Brighten dark tones (in place) so roads stand out before quantisation.
-  var px = new Uint8Array(rgba);
   for (var i = 0; i < px.length; i += 4) {
     px[i] = GAMMA_LUT[px[i]];
     px[i + 1] = GAMMA_LUT[px[i + 1]];
     px[i + 2] = GAMMA_LUT[px[i + 2]];
   }
 
+  // Paint over the attribution band at the bottom edge with black. It always
+  // sits at the bottom of whatever image Geoapify returns, so this removes it
+  // regardless of the returned size or the watch-side crop.
+  var startRow = Math.max(0, h - ATTR_BAND_PX);
+  for (var y = startRow; y < h; y++) {
+    var rowOff = y * w * 4;
+    for (var x = 0; x < w; x++) {
+      var o = rowOff + x * 4;
+      px[o] = 0; px[o + 1] = 0; px[o + 2] = 0; px[o + 3] = 255;
+    }
+  }
+
   // Re-encode with a small palette -> low-bit-depth indexed PNG.
-  var out = UPNG.encode([rgba], decoded.width, decoded.height,
-                        numColors || NUM_COLORS);
+  var out = UPNG.encode([rgba], w, h, numColors || NUM_COLORS);
   return new Uint8Array(out);
 }
 
