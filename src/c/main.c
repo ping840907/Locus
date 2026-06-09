@@ -41,6 +41,10 @@ static uint8_t *s_img_buffer = NULL;
 static uint32_t s_img_size = 0;
 static uint32_t s_img_received = 0;
 
+// Bounded retry when a received image is incomplete/corrupt.
+#define MAX_IMG_RETRIES 2
+static int s_img_retries = 0;
+
 // Config (kept in memory, mirrored in persistent storage)
 static GColor s_time_color;
 static GColor s_date_color;
@@ -67,10 +71,11 @@ static void set_status(const char *text) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-static void request_update(void) {
+static void send_update_request(uint8_t mode) {
+  // mode 1 = normal (respect refresh distance), 2 = forced re-download.
   DictionaryIterator *iter;
   if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
-    dict_write_uint8(iter, MESSAGE_KEY_REQUEST_UPDATE, 1);
+    dict_write_uint8(iter, MESSAGE_KEY_REQUEST_UPDATE, mode);
     app_message_outbox_send();
   }
 }
@@ -223,32 +228,43 @@ static void finalize_image(void) {
   uint32_t recv = s_img_received, total = s_img_size;
   static char dbg[40];
 
-  if (recv < total) {
-    snprintf(dbg, sizeof(dbg), "Short %u/%u",
-             (unsigned int)recv, (unsigned int)total);
-    set_status(dbg);
-    reset_image_stream();
-    return;
-  }
+  // The transfer is good only if every byte arrived and the PNG signature is
+  // intact. A corrupted byte (e.g. from overlapping AppMessage traffic) shows
+  // up here as a bad signature.
+  bool ok = (recv >= total) && total >= 8 &&
+            b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47;
 
-  GBitmap *new_bitmap = gbitmap_create_from_png_data(s_img_buffer, s_img_size);
-  // The PNG bytes are no longer needed once decoded (or if decode failed).
+  GBitmap *new_bitmap = NULL;
+  if (ok) {
+    new_bitmap = gbitmap_create_from_png_data(s_img_buffer, s_img_size);
+    if (!(new_bitmap && gbitmap_get_bounds(new_bitmap).size.w > 0)) {
+      if (new_bitmap) {
+        gbitmap_destroy(new_bitmap);
+        new_bitmap = NULL;
+      }
+      ok = false;
+    }
+  }
   reset_image_stream();
 
-  if (new_bitmap && gbitmap_get_bounds(new_bitmap).size.w > 0) {
+  if (ok) {
     if (s_map_bitmap) {
       gbitmap_destroy(s_map_bitmap);
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
     set_status(""); // success: clear status for a clean face
-  } else {
-    // Decode failed: surface the header bytes so we can tell why.
-    if (new_bitmap) {
-      gbitmap_destroy(new_bitmap);
-    }
-    snprintf(dbg, sizeof(dbg), "Decode fail %02x%02x%02x%02x", b0, b1, b2, b3);
+    s_img_retries = 0;
+  } else if (s_img_retries < MAX_IMG_RETRIES) {
+    // Incomplete/corrupt: ask the phone to re-download (forced) and try again.
+    s_img_retries++;
+    snprintf(dbg, sizeof(dbg), "Retrying %d/%d", s_img_retries, MAX_IMG_RETRIES);
     set_status(dbg);
+    send_update_request(2);
+  } else {
+    snprintf(dbg, sizeof(dbg), "Load failed %02x%02x%02x%02x", b0, b1, b2, b3);
+    set_status(dbg);
+    s_img_retries = 0; // allow future updates to try again
   }
 }
 
@@ -377,7 +393,7 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 
   // Ask the phone for a location/map refresh once an hour (top of the hour).
   if (tick_time->tm_min == 0) {
-    request_update();
+    send_update_request(1);
   }
 }
 

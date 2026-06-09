@@ -223,8 +223,16 @@ function resolveLabelCustomization(settings, cb) {
     encodeURIComponent(settings.MAP_STYLE) + '/style.json?apiKey=' +
     encodeURIComponent(settings.API_KEY);
 
+  var done = false;
+  var finish = function (custom) {
+    if (done) { return; }
+    done = true;
+    cb(custom);
+  };
+
   var xhr = new XMLHttpRequest();
   xhr.open('GET', styleUrl, true);
+  xhr.timeout = 15000;
   xhr.onload = function () {
     var custom = HIDE_LABELS_FALLBACK;
     try {
@@ -238,11 +246,15 @@ function resolveLabelCustomization(settings, cb) {
       console.log('style.json parse failed: ' + e);
     }
     try { localStorage.setItem(cacheKey, custom); } catch (e) {}
-    cb(custom);
+    finish(custom);
   };
   xhr.onerror = function () {
     console.log('style.json fetch failed; using fallback label list');
-    cb(HIDE_LABELS_FALLBACK);
+    finish(HIDE_LABELS_FALLBACK);
+  };
+  xhr.ontimeout = function () {
+    console.log('style.json fetch timed out; using fallback label list');
+    finish(HIDE_LABELS_FALLBACK);
   };
   xhr.send();
 }
@@ -304,32 +316,22 @@ function rememberFetch(settings, loc, size) {
 // PNG conversion (truecolor -> indexed, so the watch can decode it)
 // ---------------------------------------------------------------------------
 
-// Height (px) of the Geoapify attribution band painted onto the bottom edge.
-var ATTR_BAND_PX = 28;
-
-function toIndexedPng(arrayBuffer, numColors) {
+function toIndexedPng(arrayBuffer, numColors, brighten) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var w = decoded.width, h = decoded.height;
   console.log('Geoapify returned ' + w + 'x' + h);
   var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
-  var px = new Uint8Array(rgba);
 
-  // Brighten dark tones (in place) so roads stand out before quantisation.
-  for (var i = 0; i < px.length; i += 4) {
-    px[i] = GAMMA_LUT[px[i]];
-    px[i + 1] = GAMMA_LUT[px[i + 1]];
-    px[i + 2] = GAMMA_LUT[px[i + 2]];
-  }
-
-  // Paint over the attribution band at the bottom edge with black. It always
-  // sits at the bottom of whatever image Geoapify returns, so this removes it
-  // regardless of the returned size or the watch-side crop.
-  var startRow = Math.max(0, h - ATTR_BAND_PX);
-  for (var y = startRow; y < h; y++) {
-    var rowOff = y * w * 4;
-    for (var x = 0; x < w; x++) {
-      var o = rowOff + x * 4;
-      px[o] = 0; px[o + 1] = 0; px[o + 2] = 0; px[o + 3] = 255;
+  // Brighten dark tones (in place) so the dim grey roads of the dark styles
+  // stand out before quantisation. Skipped for light styles, which would
+  // otherwise wash out. The attribution band at the bottom edge is hidden by
+  // the watch shifting the image off the bottom of the screen.
+  if (brighten) {
+    var px = new Uint8Array(rgba);
+    for (var i = 0; i < px.length; i += 4) {
+      px[i] = GAMMA_LUT[px[i]];
+      px[i + 1] = GAMMA_LUT[px[i + 1]];
+      px[i + 2] = GAMMA_LUT[px[i + 2]];
     }
   }
 
@@ -342,7 +344,7 @@ function toIndexedPng(arrayBuffer, numColors) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, labelCustomization, numColors) {
+function downloadAndSend(settings, loc, size, labelCustomization, numColors, brighten) {
   var url = buildMapUrl(settings, loc, size, labelCustomization);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
@@ -374,7 +376,7 @@ function downloadAndSend(settings, loc, size, labelCustomization, numColors) {
     // watch can actually decode.
     var bytes;
     try {
-      bytes = toIndexedPng(xhr.response, numColors);
+      bytes = toIndexedPng(xhr.response, numColors, brighten);
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
@@ -461,21 +463,27 @@ function performUpdate(force) {
     return;
   }
 
+  // Claim the transfer slot up-front (not inside the async callback) so a
+  // second trigger can't start an overlapping transfer.
+  sending = true;
+
   var platform = getPlatform();
   var size = getPlatformSize(platform);
   var numColors = getNumColors(platform);
+  // Only brighten the dark map styles; light styles would wash out.
+  var brighten = (settings.MAP_STYLE || 'dark-matter').indexOf('dark-matter') === 0;
   console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h +
-              ', ' + numColors + ' colours');
+              ', ' + numColors + ' colours, brighten=' + brighten);
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
-    if (err) { sendStatus('No location'); return; }
+    if (err) { sendStatus('No location'); sending = false; return; }
     if (!shouldFetch(settings, loc, size, force)) {
       sendStatus('Map up to date');
+      sending = false;
       return;
     }
-    sending = true;
     resolveLabelCustomization(settings, function (labelCustomization) {
-      downloadAndSend(settings, loc, size, labelCustomization, numColors);
+      downloadAndSend(settings, loc, size, labelCustomization, numColors, brighten);
     });
   });
 }
@@ -488,11 +496,13 @@ function sendStatus(text) {
   Pebble.sendAppMessage({ 'STATUS': text });
 }
 
-function sendConfigToWatch(dict) {
+function sendConfigToWatch(dict, onDone) {
   Pebble.sendAppMessage(dict, function () {
     console.log('Config sent to watch');
+    if (onDone) { onDone(); }
   }, function () {
     console.log('Failed to send config to watch');
+    if (onDone) { onDone(); } // proceed regardless
   });
 }
 
@@ -528,23 +538,28 @@ Pebble.addEventListener('webviewclosed', function (e) {
     return;
   }
 
-  sendConfigToWatch(dict);
-
   // Read our own settings (API key, mode, etc.) from the clean copy.
   var settings = loadSettings();
   var keyLen = settings.API_KEY ? String(settings.API_KEY).length : 0;
-  if (!keyLen) {
-    // The form returned but the API key field came back empty.
-    sendStatus('Cfg: key empty');
-    return;
-  }
 
-  // Config (key / style / zoom / location) may have changed: force a refresh.
-  performUpdate(true);
+  // Send the config first, and only start the image transfer once it has been
+  // acked. Sending config and streaming the image concurrently makes the two
+  // AppMessage flows collide and corrupts the image (a single flipped byte in
+  // the PNG, seen as "Load failed"/decode failure on the watch).
+  sendConfigToWatch(dict, function () {
+    if (!keyLen) {
+      sendStatus('Cfg: key empty');
+      return;
+    }
+    // Config (key / style / zoom / location) may have changed: force a refresh.
+    performUpdate(true);
+  });
 });
 
 Pebble.addEventListener('appmessage', function (e) {
   if (e.payload && e.payload.REQUEST_UPDATE !== undefined) {
-    performUpdate(false);
+    // mode 2 = the watch asking for a forced re-download (e.g. after a
+    // corrupt transfer); mode 1 = the hourly refresh.
+    performUpdate(e.payload.REQUEST_UPDATE === 2);
   }
 });
