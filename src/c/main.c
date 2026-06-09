@@ -103,36 +103,32 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, s_bg_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
-  // Map background. The image is requested taller than the screen; we centre-
-  // crop it to the screen via a sub-bitmap so the Geoapify attribution band
-  // baked onto the bottom edge is excluded, while the location (image centre)
-  // stays at the screen centre.
+  // Map background. The Geoapify attribution band is baked onto the bottom
+  // edge of the returned image. We draw the image shifted so that its bottom
+  // edge is pushed ATTR_PUSH pixels below the screen's bottom edge, so the
+  // attribution falls outside the visible area. When the image is taller than
+  // the screen (Geoapify honoured our oversized request) this also keeps most
+  // of the map visible; when it isn't, a small strip of background appears at
+  // the top instead of the attribution at the bottom.
+  GPoint loc_point = grect_center_point(&bounds);
   if (s_map_bitmap) {
+    const int ATTR_PUSH = 28;
     GRect img = gbitmap_get_bounds(s_map_bitmap);
-    int crop_x = (img.size.w - bounds.size.w) / 2;
-    int crop_y = (img.size.h - bounds.size.h) / 2;
-    if (crop_x < 0) { crop_x = 0; }
-    if (crop_y < 0) { crop_y = 0; }
-    int draw_w = img.size.w < bounds.size.w ? img.size.w : bounds.size.w;
-    int draw_h = img.size.h < bounds.size.h ? img.size.h : bounds.size.h;
+    int origin_x = bounds.origin.x + (bounds.size.w - img.size.w) / 2;
+    int origin_y = bounds.origin.y + bounds.size.h + ATTR_PUSH - img.size.h;
 
-    GRect sub_rect = GRect(img.origin.x + crop_x, img.origin.y + crop_y,
-                           draw_w, draw_h);
-    GBitmap *cropped = gbitmap_create_as_sub_bitmap(s_map_bitmap, sub_rect);
-
-    GRect dest = GRect(bounds.origin.x + (bounds.size.w - draw_w) / 2,
-                       bounds.origin.y + (bounds.size.h - draw_h) / 2,
-                       draw_w, draw_h);
+    GRect dest = GRect(origin_x, origin_y, img.size.w, img.size.h);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
-    graphics_draw_bitmap_in_rect(ctx, cropped ? cropped : s_map_bitmap, dest);
-    if (cropped) {
-      gbitmap_destroy(cropped);
-    }
+    graphics_draw_bitmap_in_rect(ctx, s_map_bitmap, dest);
+
+    // The location sits at the centre of the map image; track it after the
+    // vertical shift so the dot still marks the real position.
+    loc_point = GPoint(origin_x + img.size.w / 2, origin_y + img.size.h / 2);
   }
 
-  // Center dot marking the user's location (the map is centered there).
+  // Dot marking the user's location (the map is centred there).
   if (s_show_center_dot) {
-    GPoint center = grect_center_point(&bounds);
+    GPoint center = loc_point;
     graphics_context_set_fill_color(ctx, GColorWhite);
     graphics_fill_circle(ctx, center, 4);
     graphics_context_set_fill_color(ctx, GColorRed);
@@ -246,7 +242,11 @@ static void finalize_image(void) {
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
-    set_status(""); // success: clear status for a clean face
+    // Temporary: report the decoded image height so we can tell whether
+    // Geoapify honoured the oversized (attribution-cropping) request.
+    GRect mb = gbitmap_get_bounds(new_bitmap);
+    snprintf(dbg, sizeof(dbg), "img %dx%d", mb.size.w, mb.size.h);
+    set_status(dbg);
   } else {
     // Decode failed: surface the header bytes so we can tell why.
     if (new_bitmap) {
