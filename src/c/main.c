@@ -207,22 +207,18 @@ static void finalize_image(void) {
     return;
   }
 
-  // Temporary diagnostic: show the first 4 bytes (a valid PNG starts with
-  // 89 50 4E 47) and how many bytes arrived vs were expected.
+  // Capture the first bytes for an error message before the buffer is freed.
   uint8_t b0 = s_img_size > 0 ? s_img_buffer[0] : 0;
   uint8_t b1 = s_img_size > 1 ? s_img_buffer[1] : 0;
   uint8_t b2 = s_img_size > 2 ? s_img_buffer[2] : 0;
   uint8_t b3 = s_img_size > 3 ? s_img_buffer[3] : 0;
+  uint32_t recv = s_img_received, total = s_img_size;
   static char dbg[40];
-  snprintf(dbg, sizeof(dbg), "%02x%02x%02x%02x %u/%u",
-           b0, b1, b2, b3,
-           (unsigned int)s_img_received, (unsigned int)s_img_size);
-  set_status(dbg);
-  APP_LOG(APP_LOG_LEVEL_INFO, "PNG hdr %02x%02x%02x%02x recv=%u size=%u",
-          b0, b1, b2, b3,
-          (unsigned int)s_img_received, (unsigned int)s_img_size);
 
-  if (s_img_received < s_img_size) {
+  if (recv < total) {
+    snprintf(dbg, sizeof(dbg), "Short %u/%u",
+             (unsigned int)recv, (unsigned int)total);
+    set_status(dbg);
     reset_image_stream();
     return;
   }
@@ -239,11 +235,12 @@ static void finalize_image(void) {
     layer_mark_dirty(s_canvas_layer);
     set_status(""); // success: clear status for a clean face
   } else {
-    // Decode produced an empty/NULL bitmap. Keep the header diagnostic on
-    // screen (set above) so we can see whether the PNG bytes are valid.
+    // Decode failed: surface the header bytes so we can tell why.
     if (new_bitmap) {
       gbitmap_destroy(new_bitmap);
     }
+    snprintf(dbg, sizeof(dbg), "Decode fail %02x%02x%02x%02x", b0, b1, b2, b3);
+    set_status(dbg);
   }
 }
 

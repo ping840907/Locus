@@ -23,6 +23,23 @@ var UPNG = require('upng-js');
 // still plenty for a monochrome dark map.
 var NUM_COLORS = 16;
 
+// Geoapify burns an attribution band onto the bottom of the static map. We
+// request the image this many extra pixels taller on each side and let the
+// watch centre-crop it, so the bottom band is clipped off-screen while the
+// location stays centred.
+var ATTR_CROP = 30;
+
+// Gamma < 1 brightens dark tones so dark-matter's dim grey roads become
+// clearly visible against the black background (and survive quantisation).
+var GAMMA = 0.5;
+var GAMMA_LUT = (function () {
+  var lut = new Uint8Array(256);
+  for (var i = 0; i < 256; i++) {
+    lut[i] = Math.round(255 * Math.pow(i / 255, GAMMA));
+  }
+  return lut;
+})();
+
 // Clay's getSettings() writes a clean, name-keyed, flattened copy of the
 // settings here (e.g. { API_KEY: "...", ZOOM: 15 }). The dict it *returns* is
 // keyed by numeric message-key IDs for sendAppMessage, so we must read our
@@ -87,7 +104,9 @@ function getPlatformSize() {
     var info = Pebble.getActiveWatchInfo && Pebble.getActiveWatchInfo();
     if (info && info.platform) { platform = info.platform; }
   } catch (e) { /* not available; use default */ }
-  return PLATFORM_SIZES[platform] || { w: 144, h: 168 };
+  var s = PLATFORM_SIZES[platform] || { w: 144, h: 168 };
+  // Request extra height so the watch can centre-crop off the attribution band.
+  return { w: s.w, h: s.h + 2 * ATTR_CROP };
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +253,15 @@ function rememberFetch(settings, loc, size) {
 function toIndexedPng(arrayBuffer) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
+
+  // Brighten dark tones (in place) so roads stand out before quantisation.
+  var px = new Uint8Array(rgba);
+  for (var i = 0; i < px.length; i += 4) {
+    px[i] = GAMMA_LUT[px[i]];
+    px[i + 1] = GAMMA_LUT[px[i + 1]];
+    px[i + 2] = GAMMA_LUT[px[i + 2]];
+  }
+
   // Re-encode with a small palette -> low-bit-depth indexed PNG.
   var out = UPNG.encode([rgba], decoded.width, decoded.height, NUM_COLORS);
   return new Uint8Array(out);
@@ -247,7 +275,6 @@ function downloadAndSend(settings, loc, size) {
   var url = buildMapUrl(settings, loc, size);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
-  sendStatus('GET map...');
 
   var xhr = new XMLHttpRequest();
   xhr.open('GET', url, true);
@@ -284,9 +311,8 @@ function downloadAndSend(settings, loc, size) {
       return;
     }
     console.log('Indexed PNG: ' + bytes.length + ' bytes');
-    // Show the result briefly; the watch then shows "Loading map..." on
-    // IMG_SIZE and clears it on a successful decode.
-    sendStatus('Conv n=' + bytes.length);
+    // The watch shows "Loading map..." on IMG_SIZE and clears it on a
+    // successful decode, so no status is sent here.
     streamImage(bytes, function (ok) {
       sending = false;
       if (ok) {
