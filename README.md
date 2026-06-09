@@ -128,6 +128,7 @@ requests/day on the free tier). The map appears once a location is resolved.
 | **API Key** | Your Geoapify API key. |
 | **Location source** | Follow current location, or use a fixed lat/lon. |
 | **Fixed latitude / longitude** | Used only in fixed-location mode. |
+| **Location check interval** | How often the watch checks your location, 15–360 min (default 60). |
 | **Refresh distance (m)** | Re-download the map only after moving this far (50–5000 m). |
 | **Zoom level** | Map zoom (10–18). |
 | **Map style** | `dark-matter` and other dark variants, plus light/grey styles. |

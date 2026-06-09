@@ -13,7 +13,7 @@
 //   * Receiving configuration (colors, toggles) from Clay.
 //   * Receiving the streamed PNG, reassembling it and decoding it.
 //   * Drawing the map + a designed time/date overlay.
-//   * Asking the phone for a refresh once an hour (and on launch).
+//   * Asking the phone for a refresh on a configurable interval (and on launch).
 // ---------------------------------------------------------------------------
 
 // Persistent storage keys
@@ -22,6 +22,7 @@
 #define PERSIST_BG_COLOR        102
 #define PERSIST_SHOW_DATE       103
 #define PERSIST_SHOW_CENTER_DOT 104
+#define PERSIST_UPDATE_INTERVAL 105
 
 // Defaults (dark theme to match the dark-matter map style)
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
@@ -29,6 +30,7 @@
 #define DEFAULT_BG_COLOR        0x000000 // black
 #define DEFAULT_SHOW_DATE       true
 #define DEFAULT_SHOW_CENTER_DOT true
+#define DEFAULT_UPDATE_INTERVAL 60       // minutes between location checks
 
 static Window *s_window;
 static Layer *s_canvas_layer;     // draws bg + map + center dot
@@ -51,6 +53,8 @@ static GColor s_date_color;
 static GColor s_bg_color;
 static bool s_show_date = DEFAULT_SHOW_DATE;
 static bool s_show_center_dot = DEFAULT_SHOW_CENTER_DOT;
+static int s_update_interval = DEFAULT_UPDATE_INTERVAL; // minutes
+static int s_minutes_since_update = 0;
 
 // Cached time strings
 static char s_time_buf[8];
@@ -307,6 +311,14 @@ static void apply_config(DictionaryIterator *iter) {
     persist_write_bool(PERSIST_SHOW_CENTER_DOT, s_show_center_dot);
     changed = true;
   }
+  t = dict_find(iter, MESSAGE_KEY_UPDATE_INTERVAL);
+  if (t) {
+    int interval = t->value->int32;
+    if (interval < 1) { interval = 1; }
+    s_update_interval = interval;
+    persist_write_int(PERSIST_UPDATE_INTERVAL, s_update_interval);
+    s_minutes_since_update = 0; // restart the cycle with the new interval
+  }
 
   if (changed) {
     layer_mark_dirty(s_canvas_layer);
@@ -325,6 +337,9 @@ static void load_persisted_config(void) {
       ? persist_read_bool(PERSIST_SHOW_DATE) : DEFAULT_SHOW_DATE;
   s_show_center_dot = persist_exists(PERSIST_SHOW_CENTER_DOT)
       ? persist_read_bool(PERSIST_SHOW_CENTER_DOT) : DEFAULT_SHOW_CENTER_DOT;
+  s_update_interval = persist_exists(PERSIST_UPDATE_INTERVAL)
+      ? persist_read_int(PERSIST_UPDATE_INTERVAL) : DEFAULT_UPDATE_INTERVAL;
+  if (s_update_interval < 1) { s_update_interval = 1; }
 }
 
 // ---------------------------------------------------------------------------
@@ -391,8 +406,11 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time_strings();
   layer_mark_dirty(s_overlay_layer);
 
-  // Ask the phone for a location/map refresh once an hour (top of the hour).
-  if (tick_time->tm_min == 0) {
+  // Ask the phone for a location/map check every configured interval. The
+  // phone still only re-downloads when moved beyond the refresh distance.
+  s_minutes_since_update++;
+  if (s_minutes_since_update >= s_update_interval) {
+    s_minutes_since_update = 0;
     send_update_request(1);
   }
 }

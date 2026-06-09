@@ -35,6 +35,7 @@
       "FIXED_LAT",
       "FIXED_LON",
       "UPDATE_DISTANCE",
+      "UPDATE_INTERVAL",
       "ZOOM",
       "SHOW_LABELS",
       "MAP_STYLE",

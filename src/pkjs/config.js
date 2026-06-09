@@ -94,6 +94,15 @@ module.exports = [
       },
       {
         "type": "slider",
+        "messageKey": "UPDATE_INTERVAL",
+        "label": "Location check interval (minutes)",
+        "defaultValue": 60,
+        "min": 15,
+        "max": 360,
+        "step": 15
+      },
+      {
+        "type": "slider",
         "messageKey": "UPDATE_DISTANCE",
         "label": "Refresh distance (metres)",
         "defaultValue": 500,
@@ -103,7 +112,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Location is checked hourly. The map is only re-downloaded when you have moved farther than this distance from the current map's centre."
+        "defaultValue": "The watch checks your location every interval above. The map is only re-downloaded when you have moved farther than this distance from the current map's centre (and always on launch / after changing settings)."
       },
       {
         "type": "slider",
