@@ -28,21 +28,11 @@ var UPNG = require('upng-js');
 // bottom edge while the location stays centred. Must exceed the band height.
 var ATTR_CROP = 60;
 
-// Gamma < 1 lifts dark tones before bucketing so the dark styles' dim grey
-// roads land in a visible brightness level rather than collapsing into the
-// background.
-var GAMMA = 0.5;
-var GAMMA_LUT = (function () {
-  var lut = new Uint8Array(256);
-  for (var i = 0; i < 256; i++) {
-    lut[i] = Math.round(255 * Math.pow(i / 255, GAMMA));
-  }
-  return lut;
-})();
-
-// Luminance thresholds (after gamma) that split a pixel into one of 4 levels:
-// 0 = background (darkest) ... 3 = highlights (brightest).
-var LEVEL_THRESHOLDS = [40, 110, 190];
+// Geoapify is asked to render the map in 4 well-separated greys
+// (0 / 85 / 170 / 255), so a pixel's level is just the nearest of those. The
+// thresholds are the midpoints; anti-aliased edge pixels snap to the closest.
+// 0 = land/background, 1 = water, 2 = roads, 3 = labels/highlights.
+var LEVEL_THRESHOLDS = [43, 128, 213];
 
 // Default map palette (a monochrome ramp matching the classic dark look).
 var DEFAULT_MAP_COLORS = [0x000000, 0x555555, 0xAAAAAA, 0xFFFFFF];
@@ -257,20 +247,54 @@ function haversine(lat1, lon1, lat2, lon2) {
 // Map URL
 // ---------------------------------------------------------------------------
 
-// Fallback label layers (used if the style JSON can't be fetched). Layer ids
-// vary by style, so we prefer the dynamic discovery below.
-var HIDE_LABELS_FALLBACK =
-  'road_label_primary:none|road_label_secondary:none|road_label_tertiary:none|' +
-  'place_label_city:none|place_label_town:none|place_label_village:none|' +
-  'place_label_other:none|water_label:none|poi_label:none';
+// Canonical greys we force Geoapify to render each semantic layer group as, so
+// the phone can bucket pixels into 4 levels deterministically (by nearest of
+// 0/85/170/255). These are NOT the final colours - the watch shows the user's
+// palette; these are just well-separated markers per layer group.
+var GREY_LAND  = '#000000'; // level 0
+var GREY_WATER = '#555555'; // level 1
+var GREY_ROAD  = '#aaaaaa'; // level 2
+var GREY_LABEL = '#ffffff'; // level 3
 
-// Resolve the styleCustomization string that hides every text (symbol) layer
-// for the chosen style. The actual layer ids differ per style, so we fetch the
-// style's JSON once (cached) and disable all of its symbol layers.
-function resolveLabelCustomization(settings, cb) {
-  if (settings.SHOW_LABELS) { cb(''); return; }
+// Fallback recolour for common OpenMapTiles layer ids if the style JSON can't
+// be fetched.
+var STYLE_CUSTOM_FALLBACK =
+  'water:' + GREY_WATER + '|' +
+  'road_motorway:' + GREY_ROAD + '|road_trunk_primary:' + GREY_ROAD + '|' +
+  'road_secondary_tertiary:' + GREY_ROAD + '|road_minor:' + GREY_ROAD + '|' +
+  'road_service_track:' + GREY_ROAD + '|road_path:' + GREY_ROAD;
 
-  var cacheKey = 'nolabels:' + settings.MAP_STYLE;
+// Build a styleCustomization string that paints each layer group as one of the
+// four canonical greys (and hides labels when names are off). Driven by the
+// style's own layer list so it works regardless of style-specific layer ids.
+function buildStyleCustomization(layers, showLabels) {
+  var parts = [];
+  (layers || []).forEach(function (layer) {
+    var id = layer.id;
+    if (!id) { return; }
+    var type = layer.type;
+    var sl = (layer['source-layer'] || '') + ' ' + id;
+
+    if (type === 'symbol') {
+      parts.push(id + ':' + (showLabels ? GREY_LABEL : 'none'));
+    } else if (type === 'background') {
+      parts.push(id + ':' + GREY_LAND);
+    } else if (/water|ocean|river|waterway|lake|sea/i.test(sl)) {
+      parts.push(id + ':' + GREY_WATER);
+    } else if (/transport|road|highway|street|bridge|tunnel|motorway|trunk|rail/i.test(sl)) {
+      parts.push(id + ':' + GREY_ROAD);
+    }
+    // Other fills (land, landuse, buildings, boundaries) keep the dark style
+    // default, which reads as the darkest level (background).
+  });
+  return parts.join('|');
+}
+
+// Resolve the full styleCustomization (recolour + label visibility) for the
+// chosen style. The style JSON is fetched once and cached per style+labels.
+function resolveStyleCustomization(settings, cb) {
+  var showLabels = !!settings.SHOW_LABELS;
+  var cacheKey = 'stylecust:' + settings.MAP_STYLE + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
   if (cached !== null) { cb(cached); return; }
 
@@ -282,6 +306,7 @@ function resolveLabelCustomization(settings, cb) {
   var finish = function (custom) {
     if (done) { return; }
     done = true;
+    try { localStorage.setItem(cacheKey, custom); } catch (e) {}
     cb(custom);
   };
 
@@ -289,32 +314,28 @@ function resolveLabelCustomization(settings, cb) {
   xhr.open('GET', styleUrl, true);
   xhr.timeout = 15000;
   xhr.onload = function () {
-    var custom = HIDE_LABELS_FALLBACK;
+    var custom = STYLE_CUSTOM_FALLBACK;
     try {
       var style = JSON.parse(xhr.responseText);
-      var ids = [];
-      (style.layers || []).forEach(function (layer) {
-        if (layer.type === 'symbol' && layer.id) { ids.push(layer.id + ':none'); }
-      });
-      if (ids.length) { custom = ids.join('|'); }
+      var built = buildStyleCustomization(style.layers, showLabels);
+      if (built) { custom = built; }
     } catch (e) {
       console.log('style.json parse failed: ' + e);
     }
-    try { localStorage.setItem(cacheKey, custom); } catch (e) {}
     finish(custom);
   };
   xhr.onerror = function () {
-    console.log('style.json fetch failed; using fallback label list');
-    finish(HIDE_LABELS_FALLBACK);
+    console.log('style.json fetch failed; using fallback customization');
+    finish(STYLE_CUSTOM_FALLBACK);
   };
   xhr.ontimeout = function () {
-    console.log('style.json fetch timed out; using fallback label list');
-    finish(HIDE_LABELS_FALLBACK);
+    console.log('style.json fetch timed out; using fallback customization');
+    finish(STYLE_CUSTOM_FALLBACK);
   };
   xhr.send();
 }
 
-function buildMapUrl(settings, loc, size, labelCustomization) {
+function buildMapUrl(settings, loc, size, styleCustomization) {
   var url = 'https://maps.geoapify.com/v1/staticmap' +
     '?style=' + encodeURIComponent(settings.MAP_STYLE || 'dark-matter') +
     '&width=' + size.w +
@@ -324,9 +345,8 @@ function buildMapUrl(settings, loc, size, labelCustomization) {
     '&format=png' +
     '&scaleFactor=1';
 
-  // When names are disabled, hide the label layers via styleCustomization.
-  if (!settings.SHOW_LABELS && labelCustomization) {
-    url += '&styleCustomization=' + encodeURIComponent(labelCustomization);
+  if (styleCustomization) {
+    url += '&styleCustomization=' + encodeURIComponent(styleCustomization);
   }
 
   url += '&apiKey=' + encodeURIComponent(settings.API_KEY);
@@ -380,9 +400,9 @@ function recolorToPalette(arrayBuffer, palette) {
   var px = new Uint8Array(UPNG.toRGBA8(decoded)[0]); // first frame, RGBA bytes
 
   for (var i = 0; i < px.length; i += 4) {
-    // Perceptual luminance, then gamma-lift so dim roads aren't lost.
+    // Geoapify rendered each layer group as one of 4 greys; snap to the
+    // nearest level by perceptual luminance.
     var lum = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8; // 0..255
-    lum = GAMMA_LUT[lum];
     var level = 0;
     if (lum >= LEVEL_THRESHOLDS[2]) { level = 3; }
     else if (lum >= LEVEL_THRESHOLDS[1]) { level = 2; }
@@ -391,9 +411,10 @@ function recolorToPalette(arrayBuffer, palette) {
     px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b; px[i + 3] = 255;
   }
 
-  // The image now contains at most 4 distinct colours, so UPNG emits a 2-bit
-  // (4-colour) indexed PNG whose palette is exactly the user's colours.
-  var out = UPNG.encode([px.buffer], w, h, 4);
+  // The image now contains at most 4 distinct colours. Encode losslessly
+  // (cnum 0) so UPNG keeps that exact palette - a colour-count quantiser can
+  // merge a sparse level (e.g. labels) and lose its colour.
+  var out = UPNG.encode([px.buffer], w, h, 0);
   return new Uint8Array(out);
 }
 
@@ -401,8 +422,8 @@ function recolorToPalette(arrayBuffer, palette) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, labelCustomization, palette) {
-  var url = buildMapUrl(settings, loc, size, labelCustomization);
+function downloadAndSend(settings, loc, size, styleCustomization, palette) {
+  var url = buildMapUrl(settings, loc, size, styleCustomization);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
 
@@ -521,8 +542,8 @@ function performUpdate(force) {
       finishSending();
       return;
     }
-    resolveLabelCustomization(settings, function (labelCustomization) {
-      downloadAndSend(settings, loc, size, labelCustomization, palette);
+    resolveStyleCustomization(settings, function (styleCustomization) {
+      downloadAndSend(settings, loc, size, styleCustomization, palette);
     });
   });
 }

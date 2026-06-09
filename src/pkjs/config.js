@@ -168,33 +168,33 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Colour the four brightness levels of the map, from background (darkest) to highlights (brightest)."
+        "defaultValue": "Colour each map layer. The map is rendered as land, water, roads and labels and recoloured to these."
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_BG",
-        "label": "Background",
+        "label": "Land / background",
         "defaultValue": "000000",
         "sunlight": true
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_1",
-        "label": "Minor roads / areas",
+        "label": "Water",
         "defaultValue": "555555",
         "sunlight": true
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_2",
-        "label": "Main roads",
+        "label": "Roads",
         "defaultValue": "AAAAAA",
         "sunlight": true
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_3",
-        "label": "Highlights / labels",
+        "label": "Labels",
         "defaultValue": "FFFFFF",
         "sunlight": true
       }
