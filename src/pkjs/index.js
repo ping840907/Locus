@@ -274,18 +274,23 @@ function buildStyleCustomization(layers, showLabels) {
     if (!id) { return; }
     var type = layer.type;
     var sl = (layer['source-layer'] || '') + ' ' + id;
+    var isWater = /water|ocean|river|waterway|lake|sea|bay|strait/i.test(sl);
+    var isBoundary = /boundary|admin|border/i.test(sl);
 
     if (type === 'symbol') {
       parts.push(id + ':' + (showLabels ? GREY_LABEL : 'none'));
     } else if (type === 'background') {
       parts.push(id + ':' + GREY_LAND);
-    } else if (/water|ocean|river|waterway|lake|sea/i.test(sl)) {
+    } else if (isWater) {
       parts.push(id + ':' + GREY_WATER);
-    } else if (/transport|road|highway|street|bridge|tunnel|motorway|trunk|rail/i.test(sl)) {
-      parts.push(id + ':' + GREY_ROAD);
+    } else if (type === 'line') {
+      // A road is drawn as a wide "casing" line plus a narrower "fill" line on
+      // top. Colour BOTH (every non-water line) the same road grey so they
+      // merge into a solid road surface instead of two thin casing edges.
+      parts.push(id + ':' + (isBoundary ? GREY_LAND : GREY_ROAD));
     }
-    // Other fills (land, landuse, buildings, boundaries) keep the dark style
-    // default, which reads as the darkest level (background).
+    // Non-water fills (land, landuse, buildings) keep the dark style default,
+    // which reads as the darkest level (background).
   });
   return parts.join('|');
 }
@@ -294,7 +299,8 @@ function buildStyleCustomization(layers, showLabels) {
 // chosen style. The style JSON is fetched once and cached per style+labels.
 function resolveStyleCustomization(settings, cb) {
   var showLabels = !!settings.SHOW_LABELS;
-  var cacheKey = 'stylecust:' + settings.MAP_STYLE + ':' + (showLabels ? 1 : 0);
+  // The "v" version invalidates caches when the customization logic changes.
+  var cacheKey = 'stylecust:v2:' + settings.MAP_STYLE + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
   if (cached !== null) { cb(cached); return; }
 
