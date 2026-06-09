@@ -202,7 +202,27 @@ static void reset_image_stream(void) {
 }
 
 static void finalize_image(void) {
-  if (!s_img_buffer || s_img_received < s_img_size) {
+  if (!s_img_buffer) {
+    set_status("No buffer");
+    return;
+  }
+
+  // Temporary diagnostic: show the first 4 bytes (a valid PNG starts with
+  // 89 50 4E 47) and how many bytes arrived vs were expected.
+  uint8_t b0 = s_img_size > 0 ? s_img_buffer[0] : 0;
+  uint8_t b1 = s_img_size > 1 ? s_img_buffer[1] : 0;
+  uint8_t b2 = s_img_size > 2 ? s_img_buffer[2] : 0;
+  uint8_t b3 = s_img_size > 3 ? s_img_buffer[3] : 0;
+  static char dbg[40];
+  snprintf(dbg, sizeof(dbg), "%02x%02x%02x%02x %u/%u",
+           b0, b1, b2, b3,
+           (unsigned int)s_img_received, (unsigned int)s_img_size);
+  set_status(dbg);
+  APP_LOG(APP_LOG_LEVEL_INFO, "PNG hdr %02x%02x%02x%02x recv=%u size=%u",
+          b0, b1, b2, b3,
+          (unsigned int)s_img_received, (unsigned int)s_img_size);
+
+  if (s_img_received < s_img_size) {
     reset_image_stream();
     return;
   }
@@ -211,24 +231,19 @@ static void finalize_image(void) {
   // The PNG bytes are no longer needed once decoded (or if decode failed).
   reset_image_stream();
 
-  if (new_bitmap) {
+  if (new_bitmap && gbitmap_get_bounds(new_bitmap).size.w > 0) {
     if (s_map_bitmap) {
       gbitmap_destroy(s_map_bitmap);
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
-    // Temporary diagnostic: report the decoded image size + format so we can
-    // confirm the bitmap is valid. (Will be reverted to a blank status.)
-    GRect b = gbitmap_get_bounds(new_bitmap);
-    GBitmapFormat fmt = gbitmap_get_format(new_bitmap);
-    static char dbg[24];
-    snprintf(dbg, sizeof(dbg), "Map %dx%d f%d", b.size.w, b.size.h, (int)fmt);
-    set_status(dbg);
-    APP_LOG(APP_LOG_LEVEL_INFO, "Decoded map: %dx%d format=%d",
-            b.size.w, b.size.h, (int)fmt);
+    set_status(""); // success: clear status for a clean face
   } else {
-    // Decode failed (most often out of memory, or an unsupported PNG format).
-    set_status("Decode failed");
+    // Decode produced an empty/NULL bitmap. Keep the header diagnostic on
+    // screen (set above) so we can see whether the PNG bytes are valid.
+    if (new_bitmap) {
+      gbitmap_destroy(new_bitmap);
+    }
   }
 }
 
