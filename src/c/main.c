@@ -111,7 +111,9 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
         bounds.origin.y + (bounds.size.h - img_bounds.size.h) / 2,
         img_bounds.size.w,
         img_bounds.size.h);
-    graphics_context_set_compositing_mode(ctx, GCompOpSet);
+    // Opaque background image: copy pixels directly (GCompOpSet would treat
+    // the image as alpha-masked and can render nothing for an opaque PNG).
+    graphics_context_set_compositing_mode(ctx, GCompOpAssign);
     graphics_draw_bitmap_in_rect(ctx, s_map_bitmap, dest);
   }
 
@@ -215,7 +217,15 @@ static void finalize_image(void) {
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
-    set_status(""); // success: clear status for a clean face
+    // Temporary diagnostic: report the decoded image size + format so we can
+    // confirm the bitmap is valid. (Will be reverted to a blank status.)
+    GRect b = gbitmap_get_bounds(new_bitmap);
+    GBitmapFormat fmt = gbitmap_get_format(new_bitmap);
+    static char dbg[24];
+    snprintf(dbg, sizeof(dbg), "Map %dx%d f%d", b.size.w, b.size.h, (int)fmt);
+    set_status(dbg);
+    APP_LOG(APP_LOG_LEVEL_INFO, "Decoded map: %dx%d format=%d",
+            b.size.w, b.size.h, (int)fmt);
   } else {
     // Decode failed (most often out of memory, or an unsupported PNG format).
     set_status("Decode failed");
