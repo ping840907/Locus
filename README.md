@@ -127,7 +127,8 @@ requests/day on the free tier). The map appears once a location is resolved.
   default set covers the common road/place/water/POI label layers. Unknown
   layers are ignored by Geoapify. You can fine-tune them in the
   [Static Map Playground](https://apidocs.geoapify.com/playground/static-maps/).
-* `flint` / `gabbro` screen sizes default to 144×168 in `index.js`; adjust
-  `PLATFORM_SIZES` there if their actual resolutions differ.
+* Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
+  (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
+  actual resolution differs).
 * Geoapify free-tier usage: hourly checks + distance-gated downloads keep
   requests well within 3,000/day.
