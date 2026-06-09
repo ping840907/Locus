@@ -1,0 +1,13 @@
+# Pebble build output
+build/
+*.pbw
+
+# Dependencies
+node_modules/
+
+# Pebble tooling caches
+.pebble-cache/
+.lock-waf*
+.waf*
+.DS_Store
+*.pyc

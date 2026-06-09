@@ -1,0 +1,60 @@
+{
+  "name": "mapwatchface",
+  "author": "tom840907",
+  "version": "1.0.0",
+  "license": "MIT",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "@rebble/clay": "^1.0.10"
+  },
+  "pebble": {
+    "displayName": "Map Face",
+    "uuid": "307fcb13-d8ff-49a9-af00-48578bf970e8",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "API_KEY",
+      "LOCATION_MODE",
+      "FIXED_LAT",
+      "FIXED_LON",
+      "UPDATE_DISTANCE",
+      "ZOOM",
+      "SHOW_LABELS",
+      "MAP_STYLE",
+      "TIME_COLOR",
+      "DATE_COLOR",
+      "BG_COLOR",
+      "SHOW_DATE",
+      "SHOW_CENTER_DOT",
+      "REQUEST_UPDATE",
+      "STATUS",
+      "IMG_SIZE",
+      "IMG_OFFSET",
+      "IMG_DATA",
+      "IMG_COMPLETE",
+      "IMG_ERROR"
+    ],
+    "resources": {
+      "media": []
+    },
+    "capabilities": [
+      "location",
+      "configurable"
+    ]
+  }
+}

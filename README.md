@@ -1,0 +1,133 @@
+# Map Face
+
+A Pebble watchface that uses the **Geoapify** Static Maps API to show a live,
+monochrome map of your surroundings (black background, grey road network) as
+the watchface background, with the **time and date** rendered on top in a
+clean, designed overlay.
+
+* Hourly location updates that **prioritise fast WiFi / cell-tower
+  positioning** (falling back to Geoapify IP geolocation).
+* The map is only re-downloaded when you move farther than a configurable
+  distance from the current map's centre — saving battery and data.
+* Fully configurable via [`@rebble/clay`](https://www.npmjs.com/package/@rebble/clay)
+  `^1.0.10`: API key, refresh distance, follow-current vs. fixed location,
+  zoom, map style, watchface colours, and whether place / road names are shown.
+* UI is in **English**; map labels follow the map's own **local language**
+  (as provided by Geoapify).
+
+Supported platforms: **aplite, basalt, chalk, diorite, emery, flint, gabbro**.
+
+---
+
+## How it works
+
+Pebble cannot fetch or process map imagery itself, so the work is split:
+
+```
+  ┌─────────────── Phone (PebbleKit JS) ───────────────┐      ┌──── Watch (C) ────┐
+  │ 1. Resolve location (WiFi/cell → IP fallback)      │      │                   │
+  │ 2. If moved > refresh distance → download PNG map  │ ───▶ │ Reassemble PNG    │
+  │    from Geoapify Static Maps API                   │ AppMessage│ Decode + draw │
+  │ 3. Stream the PNG to the watch in ~1 KB chunks     │ chunks │ map + time/date  │
+  └─────────────────────────────────────────────────────┘      └───────────────────┘
+```
+
+* **Location** — `navigator.geolocation.getCurrentPosition` with
+  `enableHighAccuracy: false`, which uses the phone's network (WiFi / cell)
+  positioning rather than GPS. If that fails, it falls back to the Geoapify
+  `ipinfo` endpoint.
+* **Map** — `https://maps.geoapify.com/v1/staticmap` with the `dark-matter`
+  style (black background, grey roads) by default, centred on your location and
+  sized to your watch's screen. Labels are hidden with `styleCustomization`
+  when "Show place / road names" is off.
+* **Transfer** — the PNG bytes are streamed to the watch over AppMessage
+  (ACK-driven, ~1 KB per message), reassembled into a buffer, and decoded with
+  `gbitmap_create_from_png_data`.
+* **Refresh cadence** — the watch asks the phone for an update at the top of
+  every hour (and on launch / whenever settings are saved). The phone only
+  re-downloads the map if you have moved beyond the configured distance.
+
+### The overlay
+
+Time (large `LECO` numerals) and date are drawn over the map with a 1 px drop
+shadow so they stay legible over any map content, separated by a short accent
+divider. Time, date, and background colours, the date, and the centre location
+dot are all configurable.
+
+---
+
+## Project layout
+
+```
+mapwatchface/
+├── package.json        # Pebble manifest + @rebble/clay dependency + messageKeys
+├── wscript             # Pebble build script
+├── src/
+│   ├── c/
+│   │   └── main.c      # Watch app: drawing, config, PNG reassembly/decode
+│   └── pkjs/
+│       ├── index.js    # PebbleKit JS: location, refresh logic, PNG streaming
+│       └── config.js   # Clay configuration page
+└── README.md
+```
+
+---
+
+## Building & installing
+
+You need the Pebble SDK (via the Rebble tooling). This repo cannot be built in
+environments without the SDK.
+
+```bash
+# Install the Clay dependency
+pebble package install @rebble/clay
+
+# Build
+pebble build
+
+# Install to an emulator…
+pebble install --emulator basalt
+
+# …or to a physical watch over the phone
+pebble install --phone <PHONE_IP>
+```
+
+On first run, open the watchface **Settings** in the Pebble app and paste your
+free Geoapify API key (get one at <https://www.geoapify.com/>, 3,000
+requests/day on the free tier). The map appears once a location is resolved.
+
+---
+
+## Configuration options (Clay)
+
+| Setting | Description |
+| --- | --- |
+| **API Key** | Your Geoapify API key. |
+| **Location source** | Follow current location, or use a fixed lat/lon. |
+| **Fixed latitude / longitude** | Used only in fixed-location mode. |
+| **Refresh distance (m)** | Re-download the map only after moving this far (50–5000 m). |
+| **Zoom level** | Map zoom (10–18). |
+| **Map style** | `dark-matter` and other dark variants, plus light/grey styles. |
+| **Show place / road names** | Toggle map labels (local-language). |
+| **Time / Date / Background colour** | Watchface overlay colours. |
+| **Show date** | Toggle the date line. |
+| **Show location dot** | Toggle the centre marker. |
+
+---
+
+## Notes & limitations
+
+* **Memory.** Decoding a screen-sized PNG on the watch is memory intensive.
+  It works best on the higher-memory colour platforms (basalt, chalk, diorite,
+  emery, flint, gabbro). On **aplite** (24 KB app RAM) the decode may fail; the
+  watchface then gracefully falls back to the background colour plus the
+  time/date overlay. Map images compress well because the dark style uses very
+  few colours.
+* **Label layer names** in `styleCustomization` can vary by map style; the
+  default set covers the common road/place/water/POI label layers. Unknown
+  layers are ignored by Geoapify. You can fine-tune them in the
+  [Static Map Playground](https://apidocs.geoapify.com/playground/static-maps/).
+* `flint` / `gabbro` screen sizes default to 144×168 in `index.js`; adjust
+  `PLATFORM_SIZES` there if their actual resolutions differ.
+* Geoapify free-tier usage: hourly checks + distance-gated downloads keep
+  requests well within 3,000/day.
