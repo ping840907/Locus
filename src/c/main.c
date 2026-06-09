@@ -24,6 +24,15 @@
 #define PERSIST_SHOW_CENTER_DOT 104
 #define PERSIST_UPDATE_INTERVAL 105
 
+// Persisted copy of the last map PNG, so the previous map can be shown on
+// launch instead of a black screen while a fresh one loads. The app has 4 KB
+// of persistent storage and each field holds at most 256 bytes, so the PNG is
+// stored across chunk keys and only cached when it fits.
+#define PERSIST_MAP_SIZE        110
+#define PERSIST_MAP_CHUNK_BASE  120  // chunk keys 120 .. 120+MAX_MAP_CHUNKS-1
+#define MAX_MAP_CHUNKS          14   // 14 * 256 = 3584 bytes (leaves room in 4KB)
+#define MAP_CHUNK_LEN           256
+
 // Defaults (dark theme to match the dark-matter map style)
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
 #define DEFAULT_DATE_COLOR      0xAAAAAA // light grey
@@ -209,6 +218,69 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
 // Image stream handling
 // ---------------------------------------------------------------------------
 
+// Persist the last map PNG across chunk keys so it can be restored on launch.
+// Writes the chunks first and the size last, so a partial/failed write (e.g.
+// over the 4KB quota) leaves no "valid" cached map. No allocations here.
+static void clear_persisted_map(void) {
+  persist_delete(PERSIST_MAP_SIZE);
+  for (int i = 0; i < MAX_MAP_CHUNKS; i++) {
+    persist_delete(PERSIST_MAP_CHUNK_BASE + i);
+  }
+}
+
+static void persist_map(const uint8_t *data, uint32_t size) {
+  if (size == 0 || size > (uint32_t)(MAX_MAP_CHUNKS * MAP_CHUNK_LEN)) {
+    clear_persisted_map(); // too big to cache; drop any old copy
+    return;
+  }
+  uint32_t chunks = (size + MAP_CHUNK_LEN - 1) / MAP_CHUNK_LEN;
+  uint32_t off = 0;
+  for (uint32_t i = 0; i < chunks; i++, off += MAP_CHUNK_LEN) {
+    uint32_t len = (size - off < MAP_CHUNK_LEN) ? (size - off) : MAP_CHUNK_LEN;
+    int written = persist_write_data(PERSIST_MAP_CHUNK_BASE + i, data + off, len);
+    if (written < (int)len) {
+      clear_persisted_map(); // quota exceeded; invalidate the whole copy
+      return;
+    }
+  }
+  // Drop leftover chunks from a previously larger map to reclaim quota.
+  for (uint32_t i = chunks; i < MAX_MAP_CHUNKS; i++) {
+    persist_delete(PERSIST_MAP_CHUNK_BASE + i);
+  }
+  persist_write_int(PERSIST_MAP_SIZE, (int)size);
+}
+
+// Restore the persisted map into s_map_bitmap (called on launch). Frees its
+// temporary buffer in all paths.
+static void load_persisted_map(void) {
+  if (!persist_exists(PERSIST_MAP_SIZE)) { return; }
+  int size = persist_read_int(PERSIST_MAP_SIZE);
+  if (size <= 0 || size > MAX_MAP_CHUNKS * MAP_CHUNK_LEN) { return; }
+
+  uint8_t *buf = malloc(size);
+  if (!buf) { return; }
+
+  bool ok = true;
+  uint32_t off = 0;
+  for (uint32_t i = 0; off < (uint32_t)size; i++, off += MAP_CHUNK_LEN) {
+    uint32_t len = ((uint32_t)size - off < MAP_CHUNK_LEN)
+                       ? ((uint32_t)size - off) : MAP_CHUNK_LEN;
+    int read = persist_read_data(PERSIST_MAP_CHUNK_BASE + i, buf + off, len);
+    if (read < (int)len) { ok = false; break; }
+  }
+
+  if (ok) {
+    GBitmap *bmp = gbitmap_create_from_png_data(buf, size);
+    if (bmp && gbitmap_get_bounds(bmp).size.w > 0) {
+      if (s_map_bitmap) { gbitmap_destroy(s_map_bitmap); }
+      s_map_bitmap = bmp;
+    } else if (bmp) {
+      gbitmap_destroy(bmp);
+    }
+  }
+  free(buf);
+}
+
 static void reset_image_stream(void) {
   if (s_img_buffer) {
     free(s_img_buffer);
@@ -256,6 +328,12 @@ static void finalize_image(void) {
       }
       ok = false;
     }
+  }
+
+  // Cache the PNG (while the buffer is still allocated) so it can be shown on
+  // the next launch instead of a black screen.
+  if (ok) {
+    persist_map(s_img_buffer, s_img_size);
   }
   reset_image_stream();
 
@@ -435,6 +513,10 @@ static void window_load(Window *window) {
   s_overlay_layer = layer_create(bounds);
   layer_set_update_proc(s_overlay_layer, overlay_update_proc);
   layer_add_child(root, s_overlay_layer);
+
+  // Show the previously cached map immediately (avoids a black screen while a
+  // fresh one is fetched).
+  load_persisted_map();
 
   update_time_strings();
 }

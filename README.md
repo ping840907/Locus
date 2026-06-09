@@ -166,6 +166,10 @@ requests/day on the free tier). The map appears once a location is resolved.
   into brightness levels, so dim roads land in a visible level instead of the
   background. Adjust the level thresholds (`LEVEL_THRESHOLDS`) in `index.js` to
   taste.
+* **Launch cache.** The last map PNG is saved in persistent storage (chunked
+  across keys, within the 4 KB quota) and shown immediately on launch, so the
+  previous map appears instead of a black screen while a fresh one loads. Maps
+  too large to fit are simply not cached.
 * Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
   (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
   actual resolution differs).
