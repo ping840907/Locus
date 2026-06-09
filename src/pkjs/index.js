@@ -62,6 +62,13 @@ var PLATFORM_SIZES = {
   gabbro:  { w: 260, h: 260 } // round screen
 };
 
+// Palette size for the re-encoded indexed PNG, per platform. Memory for the
+// on-watch decode scales with this, so the small/low-RAM watches use 16
+// colours (a compact 4-bit PNG) while high-RAM emery gets a richer palette.
+var PLATFORM_COLORS = {
+  emery: 64
+};
+
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
@@ -98,15 +105,22 @@ function loadSettings() {
   return base;
 }
 
-function getPlatformSize() {
-  var platform = 'basalt';
+function getPlatform() {
   try {
     var info = Pebble.getActiveWatchInfo && Pebble.getActiveWatchInfo();
-    if (info && info.platform) { platform = info.platform; }
-  } catch (e) { /* not available; use default */ }
+    if (info && info.platform) { return info.platform; }
+  } catch (e) { /* not available */ }
+  return 'basalt';
+}
+
+function getPlatformSize(platform) {
   var s = PLATFORM_SIZES[platform] || { w: 144, h: 168 };
   // Request extra height so the watch can centre-crop off the attribution band.
   return { w: s.w, h: s.h + 2 * ATTR_CROP };
+}
+
+function getNumColors(platform) {
+  return PLATFORM_COLORS[platform] || NUM_COLORS;
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +304,7 @@ function rememberFetch(settings, loc, size) {
 // PNG conversion (truecolor -> indexed, so the watch can decode it)
 // ---------------------------------------------------------------------------
 
-function toIndexedPng(arrayBuffer) {
+function toIndexedPng(arrayBuffer, numColors) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
 
@@ -303,7 +317,8 @@ function toIndexedPng(arrayBuffer) {
   }
 
   // Re-encode with a small palette -> low-bit-depth indexed PNG.
-  var out = UPNG.encode([rgba], decoded.width, decoded.height, NUM_COLORS);
+  var out = UPNG.encode([rgba], decoded.width, decoded.height,
+                        numColors || NUM_COLORS);
   return new Uint8Array(out);
 }
 
@@ -311,7 +326,7 @@ function toIndexedPng(arrayBuffer) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, labelCustomization) {
+function downloadAndSend(settings, loc, size, labelCustomization, numColors) {
   var url = buildMapUrl(settings, loc, size, labelCustomization);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
@@ -343,7 +358,7 @@ function downloadAndSend(settings, loc, size, labelCustomization) {
     // watch can actually decode.
     var bytes;
     try {
-      bytes = toIndexedPng(xhr.response);
+      bytes = toIndexedPng(xhr.response, numColors);
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
@@ -430,7 +445,11 @@ function performUpdate(force) {
     return;
   }
 
-  var size = getPlatformSize();
+  var platform = getPlatform();
+  var size = getPlatformSize(platform);
+  var numColors = getNumColors(platform);
+  console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h +
+              ', ' + numColors + ' colours');
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
     if (err) { sendStatus('No location'); return; }
@@ -440,7 +459,7 @@ function performUpdate(force) {
     }
     sending = true;
     resolveLabelCustomization(settings, function (labelCustomization) {
-      downloadAndSend(settings, loc, size, labelCustomization);
+      downloadAndSend(settings, loc, size, labelCustomization, numColors);
     });
   });
 }
