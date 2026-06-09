@@ -213,13 +213,6 @@ module.exports = [
         "sunlight": true
       },
       {
-        "type": "color",
-        "messageKey": "BG_COLOR",
-        "label": "Background colour",
-        "defaultValue": "000000",
-        "sunlight": true
-      },
-      {
         "type": "toggle",
         "messageKey": "SHOW_DATE",
         "label": "Show date",

@@ -259,16 +259,19 @@ var GREY_LABEL = '#ffffff'; // level 3
 // Fallback recolour (array of {layer,color}) for the canonical dark-matter
 // layer ids, used if the style JSON can't be fetched.
 function styleCustomFallback(showLabels) {
-  var roads = ['highway_motorway_casing', 'highway_motorway_inner',
-    'highway_motorway_subtle', 'highway_major_casing', 'highway_major_inner',
-    'highway_major_subtle', 'highway_minor', 'highway_path', 'railway',
-    'railway_minor', 'railway_transit'];
+  // Casings + simple single-line roads get the road grey; the black "inner"
+  // lines are hidden (see buildStyleCustomization).
+  var roadGrey = ['highway_motorway_casing', 'highway_motorway_subtle',
+    'highway_major_casing', 'highway_major_subtle', 'highway_minor',
+    'highway_path', 'railway', 'railway_minor', 'railway_transit'];
+  var roadHide = ['highway_motorway_inner', 'highway_major_inner'];
   var list = [
     { layer: 'background', color: GREY_LAND },
     { layer: 'water', color: GREY_WATER },
     { layer: 'waterway', color: GREY_WATER }
   ];
-  roads.forEach(function (r) { list.push({ layer: r, color: GREY_ROAD }); });
+  roadGrey.forEach(function (r) { list.push({ layer: r, color: GREY_ROAD }); });
+  roadHide.forEach(function (r) { list.push({ layer: r, color: 'none' }); });
   var labels = ['highway_name_other', 'highway_name_motorway', 'water_name',
     'place_country_major', 'place_country_minor', 'place_country_other',
     'place_state', 'place_city', 'place_town', 'place_village', 'place_suburb',
@@ -299,10 +302,20 @@ function buildStyleCustomization(layers, showLabels) {
     } else if (isWater) {
       out.push({ layer: id, color: GREY_WATER });
     } else if (type === 'line') {
-      // A road is drawn as a wide "casing" line plus a narrower "inner" line on
-      // top. Colour BOTH (every non-water line) the same road grey so they
-      // merge into a solid road surface instead of two thin casing edges.
-      out.push({ layer: id, color: isBoundary ? GREY_LAND : GREY_ROAD });
+      // Major roads are a wide "casing" line under a narrower "inner" line. In
+      // dark-matter the inner is BLACK (a zoom-stops expression that
+      // styleCustomization cannot recolour), which punches a hole and makes the
+      // road look hollow. So hide the inner lines and colour the casing (and
+      // simple single-line roads) the road grey -> a solid road surface.
+      if (/casing/i.test(id)) {
+        out.push({ layer: id, color: GREY_ROAD });
+      } else if (/inner/i.test(id)) {
+        out.push({ layer: id, color: 'none' });
+      } else if (isBoundary) {
+        out.push({ layer: id, color: GREY_LAND });
+      } else {
+        out.push({ layer: id, color: GREY_ROAD });
+      }
     }
     // Non-water fills (land, landuse, buildings) keep the dark style default,
     // which reads as the darkest level (background).
@@ -316,7 +329,7 @@ function resolveStyleCustomization(settings, cb) {
   var showLabels = !!settings.SHOW_LABELS;
   var style = settings.MAP_STYLE || 'dark-matter';
   // The "v" version invalidates caches when the customization logic changes.
-  var cacheKey = 'stylecust:v3:' + style + ':' + (showLabels ? 1 : 0);
+  var cacheKey = 'stylecust:v4:' + style + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
   if (cached !== null) {
     try { cb(JSON.parse(cached)); return; } catch (e) { /* refetch */ }
