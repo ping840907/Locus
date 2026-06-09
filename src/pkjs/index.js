@@ -256,19 +256,34 @@ var GREY_WATER = '#555555'; // level 1
 var GREY_ROAD  = '#aaaaaa'; // level 2
 var GREY_LABEL = '#ffffff'; // level 3
 
-// Fallback recolour for common OpenMapTiles layer ids if the style JSON can't
-// be fetched.
-var STYLE_CUSTOM_FALLBACK =
-  'water:' + GREY_WATER + '|' +
-  'road_motorway:' + GREY_ROAD + '|road_trunk_primary:' + GREY_ROAD + '|' +
-  'road_secondary_tertiary:' + GREY_ROAD + '|road_minor:' + GREY_ROAD + '|' +
-  'road_service_track:' + GREY_ROAD + '|road_path:' + GREY_ROAD;
+// Fallback recolour (array of {layer,color}) for the canonical dark-matter
+// layer ids, used if the style JSON can't be fetched.
+function styleCustomFallback(showLabels) {
+  var roads = ['highway_motorway_casing', 'highway_motorway_inner',
+    'highway_motorway_subtle', 'highway_major_casing', 'highway_major_inner',
+    'highway_major_subtle', 'highway_minor', 'highway_path', 'railway',
+    'railway_minor', 'railway_transit'];
+  var list = [
+    { layer: 'background', color: GREY_LAND },
+    { layer: 'water', color: GREY_WATER },
+    { layer: 'waterway', color: GREY_WATER }
+  ];
+  roads.forEach(function (r) { list.push({ layer: r, color: GREY_ROAD }); });
+  var labels = ['highway_name_other', 'highway_name_motorway', 'water_name',
+    'place_country_major', 'place_country_minor', 'place_country_other',
+    'place_state', 'place_city', 'place_town', 'place_village', 'place_suburb',
+    'place_other'];
+  labels.forEach(function (l) {
+    list.push({ layer: l, color: showLabels ? GREY_LABEL : 'none' });
+  });
+  return list;
+}
 
-// Build a styleCustomization string that paints each layer group as one of the
-// four canonical greys (and hides labels when names are off). Driven by the
-// style's own layer list so it works regardless of style-specific layer ids.
+// Build the styleCustomization (array of {layer,color}) that paints each layer
+// group as one of the four canonical greys (and hides labels when names are
+// off). Driven by the style's own layer list so it works for any layer ids.
 function buildStyleCustomization(layers, showLabels) {
-  var parts = [];
+  var out = [];
   (layers || []).forEach(function (layer) {
     var id = layer.id;
     if (!id) { return; }
@@ -278,41 +293,44 @@ function buildStyleCustomization(layers, showLabels) {
     var isBoundary = /boundary|admin|border/i.test(sl);
 
     if (type === 'symbol') {
-      parts.push(id + ':' + (showLabels ? GREY_LABEL : 'none'));
+      out.push({ layer: id, color: showLabels ? GREY_LABEL : 'none' });
     } else if (type === 'background') {
-      parts.push(id + ':' + GREY_LAND);
+      out.push({ layer: id, color: GREY_LAND });
     } else if (isWater) {
-      parts.push(id + ':' + GREY_WATER);
+      out.push({ layer: id, color: GREY_WATER });
     } else if (type === 'line') {
-      // A road is drawn as a wide "casing" line plus a narrower "fill" line on
+      // A road is drawn as a wide "casing" line plus a narrower "inner" line on
       // top. Colour BOTH (every non-water line) the same road grey so they
       // merge into a solid road surface instead of two thin casing edges.
-      parts.push(id + ':' + (isBoundary ? GREY_LAND : GREY_ROAD));
+      out.push({ layer: id, color: isBoundary ? GREY_LAND : GREY_ROAD });
     }
     // Non-water fills (land, landuse, buildings) keep the dark style default,
     // which reads as the darkest level (background).
   });
-  return parts.join('|');
+  return out;
 }
 
-// Resolve the full styleCustomization (recolour + label visibility) for the
-// chosen style. The style JSON is fetched once and cached per style+labels.
+// Resolve the full styleCustomization for the chosen style. The style JSON is
+// fetched once and cached (as JSON) per style+labels.
 function resolveStyleCustomization(settings, cb) {
   var showLabels = !!settings.SHOW_LABELS;
+  var style = settings.MAP_STYLE || 'dark-matter';
   // The "v" version invalidates caches when the customization logic changes.
-  var cacheKey = 'stylecust:v2:' + settings.MAP_STYLE + ':' + (showLabels ? 1 : 0);
+  var cacheKey = 'stylecust:v3:' + style + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
-  if (cached !== null) { cb(cached); return; }
+  if (cached !== null) {
+    try { cb(JSON.parse(cached)); return; } catch (e) { /* refetch */ }
+  }
 
   var styleUrl = 'https://maps.geoapify.com/v1/styles/' +
-    encodeURIComponent(settings.MAP_STYLE) + '/style.json?apiKey=' +
+    encodeURIComponent(style) + '/style.json?apiKey=' +
     encodeURIComponent(settings.API_KEY);
 
   var done = false;
   var finish = function (custom) {
     if (done) { return; }
     done = true;
-    try { localStorage.setItem(cacheKey, custom); } catch (e) {}
+    try { localStorage.setItem(cacheKey, JSON.stringify(custom)); } catch (e) {}
     cb(custom);
   };
 
@@ -320,11 +338,11 @@ function resolveStyleCustomization(settings, cb) {
   xhr.open('GET', styleUrl, true);
   xhr.timeout = 15000;
   xhr.onload = function () {
-    var custom = STYLE_CUSTOM_FALLBACK;
+    var custom = styleCustomFallback(showLabels);
     try {
-      var style = JSON.parse(xhr.responseText);
-      var built = buildStyleCustomization(style.layers, showLabels);
-      if (built) { custom = built; }
+      var styleJson = JSON.parse(xhr.responseText);
+      var built = buildStyleCustomization(styleJson.layers, showLabels);
+      if (built.length) { custom = built; }
     } catch (e) {
       console.log('style.json parse failed: ' + e);
     }
@@ -332,31 +350,13 @@ function resolveStyleCustomization(settings, cb) {
   };
   xhr.onerror = function () {
     console.log('style.json fetch failed; using fallback customization');
-    finish(STYLE_CUSTOM_FALLBACK);
+    finish(styleCustomFallback(showLabels));
   };
   xhr.ontimeout = function () {
     console.log('style.json fetch timed out; using fallback customization');
-    finish(STYLE_CUSTOM_FALLBACK);
+    finish(styleCustomFallback(showLabels));
   };
   xhr.send();
-}
-
-function buildMapUrl(settings, loc, size, styleCustomization) {
-  var url = 'https://maps.geoapify.com/v1/staticmap' +
-    '?style=' + encodeURIComponent(settings.MAP_STYLE || 'dark-matter') +
-    '&width=' + size.w +
-    '&height=' + size.h +
-    '&center=lonlat:' + loc.lon + ',' + loc.lat +
-    '&zoom=' + (settings.ZOOM || 15) +
-    '&format=png' +
-    '&scaleFactor=1';
-
-  if (styleCustomization) {
-    url += '&styleCustomization=' + encodeURIComponent(styleCustomization);
-  }
-
-  url += '&apiKey=' + encodeURIComponent(settings.API_KEY);
-  return url;
 }
 
 // ---------------------------------------------------------------------------
@@ -429,14 +429,29 @@ function recolorToPalette(arrayBuffer, palette) {
 // ---------------------------------------------------------------------------
 
 function downloadAndSend(settings, loc, size, styleCustomization, palette) {
-  var url = buildMapUrl(settings, loc, size, styleCustomization);
-  // Log the full URL so it can be tested directly in a browser / curl.
-  console.log('Requesting map: ' + url);
+  // POST request: the per-layer recolour customization is large, so it goes in
+  // a JSON body (no URL-length limit, which truncated the GET version and made
+  // roads hollow / dropped labels).
+  var url = 'https://maps.geoapify.com/v1/staticmap?apiKey=' +
+    encodeURIComponent(settings.API_KEY);
+  var body = {
+    style: settings.MAP_STYLE || 'dark-matter',
+    width: size.w,
+    height: size.h,
+    center: { lat: loc.lat, lon: loc.lon },
+    zoom: settings.ZOOM || 15,
+    format: 'png',
+    scaleFactor: 1,
+    styleCustomization: styleCustomization
+  };
+  console.log('Requesting map (POST) ' + size.w + 'x' + size.h +
+              ', ' + styleCustomization.length + ' layer overrides');
 
   var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
+  xhr.open('POST', url, true);
   xhr.responseType = 'arraybuffer';
   xhr.timeout = 30000;
+  xhr.setRequestHeader('Content-Type', 'application/json');
 
   xhr.onload = function () {
     var len = 0;
@@ -491,7 +506,7 @@ function downloadAndSend(settings, loc, size, styleCustomization, palette) {
   };
 
   try {
-    xhr.send();
+    xhr.send(JSON.stringify(body));
   } catch (e) {
     console.log('xhr.send threw: ' + e);
     sendStatus('Send threw');

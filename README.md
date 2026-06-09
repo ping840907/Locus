@@ -133,9 +133,8 @@ requests/day on the free tier). The map appears once a location is resolved.
 | **Location check interval** | How often the watch checks your location, 15–360 min (default 60). |
 | **Refresh distance (m)** | Re-download the map only after moving this far (50–5000 m). |
 | **Zoom level** | Map zoom (10–18). |
-| **Map detail** | Standard / dimmer / brighter roads (dark base styles). |
 | **Show place / road names** | Toggle map labels (local-language). |
-| **Map colours** | Recolour the map's 4 brightness levels (background → highlights). |
+| **Map colours** | Recolour the map's 4 layers: Land / Water / Roads / Labels. |
 | **Time / Date / Background colour** | Watchface overlay colours. |
 | **Show date** | Toggle the date line. |
 | **Show location dot** | Toggle the centre marker. |
@@ -150,10 +149,14 @@ requests/day on the free tier). The map appears once a location is resolved.
   bitmap, so it fits comfortably even on emery's large screen (and changing a
   colour just re-fetches and re-bakes — no watch-side palette code). The old
   bitmap is freed before the new one is decoded to avoid holding two at once.
-* **Hiding labels** is done by disabling every text (symbol) layer of the
-  chosen style. Because layer ids differ per style, the app fetches the style's
-  JSON once (cached) and builds the `styleCustomization` list from its symbol
-  layers, falling back to a built-in list if the style JSON can't be fetched.
+* **Layer recolouring.** The phone fetches the style's JSON (cached), and from
+  its layer list builds a `styleCustomization` that paints each group as one of
+  four canonical greys — land `#000000`, water `#555555`, roads `#AAAAAA`,
+  labels `#FFFFFF` (every road casing *and* inner line is coloured so roads are
+  solid, not hollow). This is sent as a **POST** request (the customization is
+  too large for a URL). The phone then snaps each pixel to the nearest of the
+  four greys and paints the user's palette. Hiding labels sets the symbol
+  layers to `none`.
 * **Attribution.** Geoapify burns an attribution band onto the bottom of the
   static image. The app requests the map taller and centre-crops it on the
   watch so the band is off-screen while the location stays centred. Note that

@@ -135,17 +135,6 @@ module.exports = [
         "defaultValue": "Map appearance"
       },
       {
-        "type": "select",
-        "messageKey": "MAP_STYLE",
-        "label": "Map detail",
-        "defaultValue": "dark-matter",
-        "options": [
-          { "label": "Standard", "value": "dark-matter" },
-          { "label": "Dimmer roads", "value": "dark-matter-dark-grey" },
-          { "label": "Brighter roads", "value": "dark-matter-yellow-roads" }
-        ]
-      },
-      {
         "type": "toggle",
         "messageKey": "SHOW_LABELS",
         "label": "Show place / road names",
@@ -153,7 +142,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "The map is reduced to four brightness levels and recoloured with the palette below. Names are shown in the map's own local language."
+        "defaultValue": "The map is split into land, water, roads and labels and recoloured with the palette below. Names are shown in the map's own local language."
       }
     ]
   },
