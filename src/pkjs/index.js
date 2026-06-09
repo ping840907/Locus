@@ -357,10 +357,33 @@ Pebble.addEventListener('showConfiguration', function () {
 });
 
 Pebble.addEventListener('webviewclosed', function (e) {
-  if (e && !e.response) { return; }
-  var dict = clay.getSettings(e.response); // converted, ready for AppMessage
+  if (!e || !e.response) {
+    // Config page closed without submitting (e.g. cancelled / back).
+    sendStatus('Cfg: no response');
+    return;
+  }
+
+  var dict;
+  try {
+    dict = clay.getSettings(e.response); // converted, ready for AppMessage
+  } catch (err) {
+    console.log('getSettings error: ' + err);
+    sendStatus('Cfg parse err');
+    return;
+  }
+
+  console.log('Config dict: ' + JSON.stringify(dict));
+  var keyLen = (dict && dict.API_KEY) ? String(dict.API_KEY).length : 0;
+
   saveSettings(dict);
   sendConfigToWatch(dict);
+
+  if (!keyLen) {
+    // The form returned but the API key field came back empty.
+    sendStatus('Cfg: key empty');
+    return;
+  }
+
   // Config (key / style / zoom / location) may have changed: force a refresh.
   performUpdate(true);
 });
