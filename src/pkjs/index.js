@@ -240,19 +240,25 @@ function downloadAndSend(settings, loc, size) {
   xhr.responseType = 'arraybuffer';
   xhr.onload = function () {
     if (xhr.status !== 200) {
-      console.log('Map download HTTP ' + xhr.status);
+      sendStatus('Map HTTP ' + xhr.status);
       sending = false;
       return;
     }
     var bytes = new Uint8Array(xhr.response);
     console.log('Map downloaded: ' + bytes.length + ' bytes');
+    // The watch shows "Loading map..." on IMG_SIZE and clears it on a
+    // successful decode, so we do not send a status during the stream itself.
     streamImage(bytes, function (ok) {
       sending = false;
-      if (ok) { rememberFetch(settings, loc, size); }
+      if (ok) {
+        rememberFetch(settings, loc, size);
+      } else {
+        sendStatus('Transfer failed');
+      }
     });
   };
   xhr.onerror = function () {
-    console.log('Map download network error');
+    sendStatus('Network error');
     sending = false;
   };
   xhr.send();
@@ -302,20 +308,29 @@ function performUpdate(force) {
   var settings = loadSettings();
 
   if (!settings.API_KEY) {
-    console.log('No API key configured; skipping map update.');
+    sendStatus('Set API key');
     return;
   }
 
   var size = getPlatformSize();
+  sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
-    if (err) { console.log('Location error: ' + err); return; }
+    if (err) { sendStatus('No location'); return; }
     if (!shouldFetch(settings, loc, size, force)) {
-      console.log('Within refresh distance; map unchanged.');
+      sendStatus('Map up to date');
       return;
     }
     sending = true;
     downloadAndSend(settings, loc, size);
   });
+}
+
+// Push a short status/debug line to the watch face. Only called at idle
+// moments (never interleaved with the image chunk stream) so it cannot
+// disrupt the ACK-driven transfer.
+function sendStatus(text) {
+  console.log('Status: ' + text);
+  Pebble.sendAppMessage({ 'STATUS': text });
 }
 
 function sendConfigToWatch(dict) {
@@ -332,7 +347,9 @@ function sendConfigToWatch(dict) {
 
 Pebble.addEventListener('ready', function () {
   console.log('Map Face JS ready');
-  performUpdate(false);
+  // Force on launch: the watch does not persist the decoded map, so it needs
+  // a fresh image every time the watchface starts.
+  performUpdate(true);
 });
 
 Pebble.addEventListener('showConfiguration', function () {

@@ -47,6 +47,24 @@ Pebble cannot fetch or process map imagery itself, so the work is split:
   every hour (and on launch / whenever settings are saved). The phone only
   re-downloads the map if you have moved beyond the configured distance.
 
+### On-watch status line
+
+A small status line at the bottom of the face surfaces what the pipeline is
+doing, so you can diagnose problems without a computer:
+
+| Status | Meaning |
+| --- | --- |
+| `Set API key` | No Geoapify API key configured. |
+| `Locating...` | Resolving location (WiFi/cell, then IP fallback). |
+| `No location` | Location could not be resolved. |
+| `Map up to date` | Within refresh distance; existing map kept. |
+| `Map HTTP <code>` | Geoapify returned an error (e.g. 401 = bad key). |
+| `Network error` | The map download failed at the network level. |
+| `Loading map...` | Receiving the image stream from the phone. |
+| `Img buffer fail` | Not enough memory to buffer the incoming PNG. |
+| `Decode failed` | PNG could not be decoded (often low memory). |
+| _(blank)_ | Map decoded and shown successfully. |
+
 ### The overlay
 
 Time (large `LECO` numerals) and date are drawn over the map with a 1 px drop

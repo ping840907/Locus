@@ -52,6 +52,17 @@ static bool s_show_center_dot = DEFAULT_SHOW_CENTER_DOT;
 static char s_time_buf[8];
 static char s_date_buf[24];
 
+// Transient status / debug line shown at the bottom of the face.
+static char s_status[40] = "";
+
+static void set_status(const char *text) {
+  strncpy(s_status, text, sizeof(s_status) - 1);
+  s_status[sizeof(s_status) - 1] = '\0';
+  if (s_overlay_layer) {
+    layer_mark_dirty(s_overlay_layer);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -163,6 +174,16 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
     draw_text_with_shadow(ctx, s_date_buf, date_font, date_box,
                           s_date_color, shadow, GTextAlignmentCenter);
   }
+
+  // Status / debug line at the bottom (only when there is something to show).
+  if (s_status[0] != '\0') {
+    GFont status_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+    GRect status_box = GRect(bounds.origin.x + 4,
+                             bounds.origin.y + bounds.size.h - 22,
+                             bounds.size.w - 8, 18);
+    draw_text_with_shadow(ctx, s_status, status_font, status_box,
+                          GColorYellow, shadow, GTextAlignmentCenter);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -194,8 +215,11 @@ static void finalize_image(void) {
     }
     s_map_bitmap = new_bitmap;
     layer_mark_dirty(s_canvas_layer);
+    set_status(""); // success: clear status for a clean face
+  } else {
+    // Decode failed (most often out of memory, or an unsupported PNG format).
+    set_status("Decode failed");
   }
-  // If decode failed we simply keep the previous map (or the bg color).
 }
 
 // ---------------------------------------------------------------------------
@@ -267,11 +291,14 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (size_t) {
     reset_image_stream();
     s_img_size = size_t->value->uint32;
-    if (s_img_size > 0 && s_img_size < 64 * 1024) {
+    if (s_img_size > 0 && s_img_size < 256 * 1024) {
       s_img_buffer = malloc(s_img_size);
     }
     if (!s_img_buffer) {
       s_img_size = 0; // allocation failed; ignore the incoming stream
+      set_status("Img buffer fail");
+    } else {
+      set_status("Loading map...");
     }
     return;
   }
@@ -292,6 +319,13 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   // Image stream control: transfer complete.
   if (dict_find(iter, MESSAGE_KEY_IMG_COMPLETE)) {
     finalize_image();
+    return;
+  }
+
+  // Status / debug line pushed from the phone.
+  Tuple *status_t = dict_find(iter, MESSAGE_KEY_STATUS);
+  if (status_t && status_t->value->cstring) {
+    set_status(status_t->value->cstring);
     return;
   }
 
