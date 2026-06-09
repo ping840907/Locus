@@ -13,6 +13,16 @@ var Clay = require('@rebble/clay');
 var clayConfig = require('./config');
 var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
 
+// UPNG (with pako) lets us decode Geoapify's 24-bit truecolor PNG and
+// re-encode it as a palettized indexed PNG, which is the only kind Pebble's
+// gbitmap_create_from_png_data() can decode.
+var UPNG = require('upng-js');
+
+// Number of palette colours for the re-encoded image. 16 colours => a 4-bit
+// indexed PNG: small to transfer and cheap for the watch to decode, while
+// still plenty for a monochrome dark map.
+var NUM_COLORS = 16;
+
 // Clay's getSettings() writes a clean, name-keyed, flattened copy of the
 // settings here (e.g. { API_KEY: "...", ZOOM: 15 }). The dict it *returns* is
 // keyed by numeric message-key IDs for sendAppMessage, so we must read our
@@ -218,6 +228,18 @@ function rememberFetch(settings, loc, size) {
 }
 
 // ---------------------------------------------------------------------------
+// PNG conversion (truecolor -> indexed, so the watch can decode it)
+// ---------------------------------------------------------------------------
+
+function toIndexedPng(arrayBuffer) {
+  var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
+  var rgba = UPNG.toRGBA8(decoded)[0];             // first frame as RGBA bytes
+  // Re-encode with a small palette -> low-bit-depth indexed PNG.
+  var out = UPNG.encode([rgba], decoded.width, decoded.height, NUM_COLORS);
+  return new Uint8Array(out);
+}
+
+// ---------------------------------------------------------------------------
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
@@ -250,10 +272,21 @@ function downloadAndSend(settings, loc, size) {
       return;
     }
 
-    var bytes = new Uint8Array(xhr.response);
-    // Show the HTTP result briefly; the watch then shows "Loading map..." on
+    // Geoapify returns a truecolor PNG; convert it to an indexed PNG that the
+    // watch can actually decode.
+    var bytes;
+    try {
+      bytes = toIndexedPng(xhr.response);
+    } catch (convErr) {
+      console.log('PNG conversion failed: ' + convErr);
+      sendStatus('Convert fail');
+      sending = false;
+      return;
+    }
+    console.log('Indexed PNG: ' + bytes.length + ' bytes');
+    // Show the result briefly; the watch then shows "Loading map..." on
     // IMG_SIZE and clears it on a successful decode.
-    sendStatus('H200 n=' + bytes.length);
+    sendStatus('Conv n=' + bytes.length);
     streamImage(bytes, function (ok) {
       sending = false;
       if (ok) {

@@ -40,9 +40,14 @@ Pebble cannot fetch or process map imagery itself, so the work is split:
   style (black background, grey roads) by default, centred on your location and
   sized to your watch's screen. Labels are hidden with `styleCustomization`
   when "Show place / road names" is off.
-* **Transfer** — the PNG bytes are streamed to the watch over AppMessage
-  (ACK-driven, ~1 KB per message), reassembled into a buffer, and decoded with
-  `gbitmap_create_from_png_data`.
+* **Conversion** — Geoapify returns a 24-bit truecolor PNG, which Pebble's
+  `gbitmap_create_from_png_data` cannot decode (it only supports palettized /
+  greyscale PNG). The phone therefore decodes the PNG and re-encodes it as a
+  16-colour **indexed PNG** (`upng-js` + `pako`, pure JS — no canvas needed)
+  before sending it.
+* **Transfer** — the indexed PNG bytes are streamed to the watch over
+  AppMessage (ACK-driven, ~1 KB per message), reassembled into a buffer, and
+  decoded with `gbitmap_create_from_png_data`.
 * **Refresh cadence** — the watch asks the phone for an update at the top of
   every hour (and on launch / whenever settings are saved). The phone only
   re-downloads the map if you have moved beyond the configured distance.
@@ -97,8 +102,8 @@ You need the Pebble SDK (via the Rebble tooling). This repo cannot be built in
 environments without the SDK.
 
 ```bash
-# Install the Clay dependency
-pebble package install @rebble/clay
+# Install JS dependencies (@rebble/clay, upng-js, pako)
+npm install
 
 # Build
 pebble build
