@@ -26,8 +26,8 @@ var NUM_COLORS = 16;
 // Geoapify burns an attribution band onto the bottom of the static map. We
 // request the image this many extra pixels taller on each side and let the
 // watch centre-crop it, so the bottom band is clipped off-screen while the
-// location stays centred.
-var ATTR_CROP = 30;
+// location stays centred. (Enough to cover a two-line attribution.)
+var ATTR_CROP = 40;
 
 // Gamma < 1 brightens dark tones so dark-matter's dim grey roads become
 // clearly visible against the black background (and survive quantisation).
@@ -188,12 +188,52 @@ function haversine(lat1, lon1, lat2, lon2) {
 // Map URL
 // ---------------------------------------------------------------------------
 
-var HIDE_LABELS =
+// Fallback label layers (used if the style JSON can't be fetched). Layer ids
+// vary by style, so we prefer the dynamic discovery below.
+var HIDE_LABELS_FALLBACK =
   'road_label_primary:none|road_label_secondary:none|road_label_tertiary:none|' +
   'place_label_city:none|place_label_town:none|place_label_village:none|' +
   'place_label_other:none|water_label:none|poi_label:none';
 
-function buildMapUrl(settings, loc, size) {
+// Resolve the styleCustomization string that hides every text (symbol) layer
+// for the chosen style. The actual layer ids differ per style, so we fetch the
+// style's JSON once (cached) and disable all of its symbol layers.
+function resolveLabelCustomization(settings, cb) {
+  if (settings.SHOW_LABELS) { cb(''); return; }
+
+  var cacheKey = 'nolabels:' + settings.MAP_STYLE;
+  var cached = localStorage.getItem(cacheKey);
+  if (cached !== null) { cb(cached); return; }
+
+  var styleUrl = 'https://maps.geoapify.com/v1/styles/' +
+    encodeURIComponent(settings.MAP_STYLE) + '/style.json?apiKey=' +
+    encodeURIComponent(settings.API_KEY);
+
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', styleUrl, true);
+  xhr.onload = function () {
+    var custom = HIDE_LABELS_FALLBACK;
+    try {
+      var style = JSON.parse(xhr.responseText);
+      var ids = [];
+      (style.layers || []).forEach(function (layer) {
+        if (layer.type === 'symbol' && layer.id) { ids.push(layer.id + ':none'); }
+      });
+      if (ids.length) { custom = ids.join('|'); }
+    } catch (e) {
+      console.log('style.json parse failed: ' + e);
+    }
+    try { localStorage.setItem(cacheKey, custom); } catch (e) {}
+    cb(custom);
+  };
+  xhr.onerror = function () {
+    console.log('style.json fetch failed; using fallback label list');
+    cb(HIDE_LABELS_FALLBACK);
+  };
+  xhr.send();
+}
+
+function buildMapUrl(settings, loc, size, labelCustomization) {
   var url = 'https://maps.geoapify.com/v1/staticmap' +
     '?style=' + encodeURIComponent(settings.MAP_STYLE || 'dark-matter') +
     '&width=' + size.w +
@@ -204,8 +244,8 @@ function buildMapUrl(settings, loc, size) {
     '&scaleFactor=1';
 
   // When names are disabled, hide the label layers via styleCustomization.
-  if (!settings.SHOW_LABELS) {
-    url += '&styleCustomization=' + encodeURIComponent(HIDE_LABELS);
+  if (!settings.SHOW_LABELS && labelCustomization) {
+    url += '&styleCustomization=' + encodeURIComponent(labelCustomization);
   }
 
   url += '&apiKey=' + encodeURIComponent(settings.API_KEY);
@@ -271,8 +311,8 @@ function toIndexedPng(arrayBuffer) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size) {
-  var url = buildMapUrl(settings, loc, size);
+function downloadAndSend(settings, loc, size, labelCustomization) {
+  var url = buildMapUrl(settings, loc, size, labelCustomization);
   // Log the full URL so it can be tested directly in a browser / curl.
   console.log('Requesting map: ' + url);
 
@@ -399,7 +439,9 @@ function performUpdate(force) {
       return;
     }
     sending = true;
-    downloadAndSend(settings, loc, size);
+    resolveLabelCustomization(settings, function (labelCustomization) {
+      downloadAndSend(settings, loc, size, labelCustomization);
+    });
   });
 }
 

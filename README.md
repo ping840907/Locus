@@ -146,10 +146,17 @@ requests/day on the free tier). The map appears once a location is resolved.
   watchface then gracefully falls back to the background colour plus the
   time/date overlay. Map images compress well because the dark style uses very
   few colours.
-* **Label layer names** in `styleCustomization` can vary by map style; the
-  default set covers the common road/place/water/POI label layers. Unknown
-  layers are ignored by Geoapify. You can fine-tune them in the
-  [Static Map Playground](https://apidocs.geoapify.com/playground/static-maps/).
+* **Hiding labels** is done by disabling every text (symbol) layer of the
+  chosen style. Because layer ids differ per style, the app fetches the style's
+  JSON once (cached) and builds the `styleCustomization` list from its symbol
+  layers, falling back to a built-in list if the style JSON can't be fetched.
+* **Attribution.** Geoapify burns an attribution band onto the bottom of the
+  static image. The app requests the map taller and centre-crops it on the
+  watch so the band is off-screen while the location stays centred. Note that
+  the Geoapify free tier expects attribution to remain visible — keep this in
+  mind for any public distribution.
+* **Road visibility.** A gamma curve brightens the dark style's dim grey roads
+  before the image is quantised, so the road network reads clearly on-screen.
 * Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
   (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
   actual resolution differs).

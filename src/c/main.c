@@ -103,18 +103,31 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, s_bg_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
-  // Map background, centered and filling the screen.
+  // Map background. The image is requested taller than the screen; we centre-
+  // crop it to the screen via a sub-bitmap so the Geoapify attribution band
+  // baked onto the bottom edge is excluded, while the location (image centre)
+  // stays at the screen centre.
   if (s_map_bitmap) {
-    GRect img_bounds = gbitmap_get_bounds(s_map_bitmap);
-    GRect dest = GRect(
-        bounds.origin.x + (bounds.size.w - img_bounds.size.w) / 2,
-        bounds.origin.y + (bounds.size.h - img_bounds.size.h) / 2,
-        img_bounds.size.w,
-        img_bounds.size.h);
-    // Opaque background image: copy pixels directly (GCompOpSet would treat
-    // the image as alpha-masked and can render nothing for an opaque PNG).
+    GRect img = gbitmap_get_bounds(s_map_bitmap);
+    int crop_x = (img.size.w - bounds.size.w) / 2;
+    int crop_y = (img.size.h - bounds.size.h) / 2;
+    if (crop_x < 0) { crop_x = 0; }
+    if (crop_y < 0) { crop_y = 0; }
+    int draw_w = img.size.w < bounds.size.w ? img.size.w : bounds.size.w;
+    int draw_h = img.size.h < bounds.size.h ? img.size.h : bounds.size.h;
+
+    GRect sub_rect = GRect(img.origin.x + crop_x, img.origin.y + crop_y,
+                           draw_w, draw_h);
+    GBitmap *cropped = gbitmap_create_as_sub_bitmap(s_map_bitmap, sub_rect);
+
+    GRect dest = GRect(bounds.origin.x + (bounds.size.w - draw_w) / 2,
+                       bounds.origin.y + (bounds.size.h - draw_h) / 2,
+                       draw_w, draw_h);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
-    graphics_draw_bitmap_in_rect(ctx, s_map_bitmap, dest);
+    graphics_draw_bitmap_in_rect(ctx, cropped ? cropped : s_map_bitmap, dest);
+    if (cropped) {
+      gbitmap_destroy(cropped);
+    }
   }
 
   // Center dot marking the user's location (the map is centered there).
