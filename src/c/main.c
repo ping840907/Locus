@@ -29,6 +29,7 @@
 // of persistent storage and each field holds at most 256 bytes, so the PNG is
 // stored across chunk keys and only cached when it fits.
 #define PERSIST_MAP_SIZE        110
+#define PERSIST_MAP_HASH        111  // hash of the cached PNG (to skip rewrites)
 #define PERSIST_MAP_CHUNK_BASE  120  // chunk keys 120 .. 120+MAX_MAP_CHUNKS-1
 #define MAX_MAP_CHUNKS          14   // 14 * 256 = 3584 bytes (leaves room in 4KB)
 #define MAP_CHUNK_LEN           256
@@ -223,15 +224,27 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
 // over the 4KB quota) leaves no "valid" cached map. No allocations here.
 static void clear_persisted_map(void) {
   persist_delete(PERSIST_MAP_SIZE);
+  persist_delete(PERSIST_MAP_HASH);
   for (int i = 0; i < MAX_MAP_CHUNKS; i++) {
     persist_delete(PERSIST_MAP_CHUNK_BASE + i);
   }
 }
 
-static void persist_map(const uint8_t *data, uint32_t size) {
+// Cheap FNV-1a hash of the PNG bytes, used to detect whether the map changed.
+static uint32_t png_hash(const uint8_t *data, uint32_t size) {
+  uint32_t h = 2166136261u;
+  for (uint32_t i = 0; i < size; i++) {
+    h ^= data[i];
+    h *= 16777619u;
+  }
+  return h;
+}
+
+// Returns true if a valid cache was written.
+static bool persist_map(const uint8_t *data, uint32_t size) {
   if (size == 0 || size > (uint32_t)(MAX_MAP_CHUNKS * MAP_CHUNK_LEN)) {
     clear_persisted_map(); // too big to cache; drop any old copy
-    return;
+    return false;
   }
   uint32_t chunks = (size + MAP_CHUNK_LEN - 1) / MAP_CHUNK_LEN;
   uint32_t off = 0;
@@ -240,7 +253,7 @@ static void persist_map(const uint8_t *data, uint32_t size) {
     int written = persist_write_data(PERSIST_MAP_CHUNK_BASE + i, data + off, len);
     if (written < (int)len) {
       clear_persisted_map(); // quota exceeded; invalidate the whole copy
-      return;
+      return false;
     }
   }
   // Drop leftover chunks from a previously larger map to reclaim quota.
@@ -248,6 +261,7 @@ static void persist_map(const uint8_t *data, uint32_t size) {
     persist_delete(PERSIST_MAP_CHUNK_BASE + i);
   }
   persist_write_int(PERSIST_MAP_SIZE, (int)size);
+  return true;
 }
 
 // Restore the persisted map into s_map_bitmap (called on launch). Frees its
@@ -331,9 +345,19 @@ static void finalize_image(void) {
   }
 
   // Cache the PNG (while the buffer is still allocated) so it can be shown on
-  // the next launch instead of a black screen.
+  // the next launch instead of a black screen. Only rewrite persistent storage
+  // when the map actually changed (its hash differs from what is cached), to
+  // avoid needless flash writes on identical forced/periodic refreshes.
   if (ok) {
-    persist_map(s_img_buffer, s_img_size);
+    uint32_t h = png_hash(s_img_buffer, s_img_size);
+    bool unchanged = persist_exists(PERSIST_MAP_SIZE) &&
+                     persist_exists(PERSIST_MAP_HASH) &&
+                     (uint32_t)persist_read_int(PERSIST_MAP_HASH) == h;
+    if (!unchanged) {
+      if (persist_map(s_img_buffer, s_img_size)) {
+        persist_write_int(PERSIST_MAP_HASH, (int)h);
+      }
+    }
   }
   reset_image_stream();
 
