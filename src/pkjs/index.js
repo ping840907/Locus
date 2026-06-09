@@ -48,7 +48,52 @@ var CLAY_SETTINGS_KEY = 'clay-settings';
 var LAST_FETCH_KEY = 'mapface-lastfetch';
 var CHUNK_SIZE = 1000; // bytes of image data per AppMessage
 
-var sending = false; // guard against overlapping transfers
+var sending = false;        // a map transfer is in progress
+var pendingUpdate = false;  // an update was requested while sending
+var pendingForce = false;
+
+// ---------------------------------------------------------------------------
+// Serialised AppMessage sender.
+//
+// PebbleKit JS / AppMessage only handles one outbound message at a time;
+// overlapping sends collide and corrupt the data (seen as a flipped byte in
+// the streamed PNG). Every outbound message - status, config and image chunks
+// alike - goes through this single queue so only one is ever in flight.
+// ---------------------------------------------------------------------------
+var outQueue = [];
+var outBusy = false;
+
+function enqueueSend(dict, onAck, onNack) {
+  outQueue.push({ dict: dict, onAck: onAck, onNack: onNack });
+  pumpQueue();
+}
+
+function pumpQueue() {
+  if (outBusy || outQueue.length === 0) { return; }
+  outBusy = true;
+  var item = outQueue.shift();
+  Pebble.sendAppMessage(item.dict, function () {
+    outBusy = false;
+    if (item.onAck) { item.onAck(); }
+    pumpQueue();
+  }, function (e) {
+    outBusy = false;
+    if (item.onNack) { item.onNack(e); }
+    pumpQueue();
+  });
+}
+
+// Mark the current transfer finished and run any update that was requested
+// while it was in progress.
+function finishSending() {
+  sending = false;
+  if (pendingUpdate) {
+    pendingUpdate = false;
+    var f = pendingForce;
+    pendingForce = false;
+    performUpdate(f);
+  }
+}
 
 // Per-platform target image size. Unknown/new platforms fall back to the most
 // common Pebble screen size.
@@ -362,13 +407,13 @@ function downloadAndSend(settings, loc, size, labelCustomization, numColors, bri
 
     if (xhr.status !== 200) {
       sendStatus('HTTP ' + xhr.status);
-      sending = false;
+      finishSending();
       return;
     }
     if (len <= 0) {
       // 200 but no binary body: arraybuffer not honoured by this JS runtime.
       sendStatus('Empty body n=' + len);
-      sending = false;
+      finishSending();
       return;
     }
 
@@ -380,30 +425,30 @@ function downloadAndSend(settings, loc, size, labelCustomization, numColors, bri
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
-      sending = false;
+      finishSending();
       return;
     }
     console.log('Indexed PNG: ' + bytes.length + ' bytes');
     // The watch shows "Loading map..." on IMG_SIZE and clears it on a
     // successful decode, so no status is sent here.
     streamImage(bytes, function (ok) {
-      sending = false;
       if (ok) {
         rememberFetch(settings, loc, size);
       } else {
         sendStatus('Transfer failed');
       }
+      finishSending();
     });
   };
   xhr.onerror = function () {
     console.log('Map request network error (status ' + xhr.status + ')');
     sendStatus('Net err s=' + xhr.status);
-    sending = false;
+    finishSending();
   };
   xhr.ontimeout = function () {
     console.log('Map request timed out');
     sendStatus('Map timeout');
-    sending = false;
+    finishSending();
   };
 
   try {
@@ -411,43 +456,28 @@ function downloadAndSend(settings, loc, size, labelCustomization, numColors, bri
   } catch (e) {
     console.log('xhr.send threw: ' + e);
     sendStatus('Send threw');
-    sending = false;
+    finishSending();
   }
 }
 
 function streamImage(bytes, done) {
   var size = bytes.length;
 
-  Pebble.sendAppMessage({ 'IMG_SIZE': size }, function () {
-    sendChunk(0);
-  }, function () {
-    console.log('Failed to start image transfer');
-    done(false);
-  });
-
-  function sendChunk(offset) {
-    if (offset >= size) {
-      Pebble.sendAppMessage({ 'IMG_COMPLETE': 1 }, function () {
-        console.log('Image transfer complete');
-        done(true);
-      }, function () { done(false); });
-      return;
-    }
+  // Enqueue the whole transfer; the serialised queue sends one message at a
+  // time, in order, so chunks never overlap each other or other traffic.
+  enqueueSend({ 'IMG_SIZE': size });
+  for (var offset = 0; offset < size; offset += CHUNK_SIZE) {
     var end = Math.min(offset + CHUNK_SIZE, size);
     var chunk = Array.prototype.slice.call(bytes.subarray(offset, end));
-    Pebble.sendAppMessage(
-      { 'IMG_OFFSET': offset, 'IMG_DATA': chunk },
-      function () { sendChunk(end); },
-      function () {
-        // One retry on failure before giving up.
-        Pebble.sendAppMessage(
-          { 'IMG_OFFSET': offset, 'IMG_DATA': chunk },
-          function () { sendChunk(end); },
-          function () { console.log('Chunk failed at ' + offset); done(false); }
-        );
-      }
-    );
+    enqueueSend({ 'IMG_OFFSET': offset, 'IMG_DATA': chunk });
   }
+  enqueueSend({ 'IMG_COMPLETE': 1 }, function () {
+    console.log('Image transfer complete');
+    done(true);
+  }, function () {
+    console.log('Image transfer failed to complete');
+    done(false);
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -476,10 +506,10 @@ function performUpdate(force) {
               ', ' + numColors + ' colours, brighten=' + brighten);
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
-    if (err) { sendStatus('No location'); sending = false; return; }
+    if (err) { sendStatus('No location'); finishSending(); return; }
     if (!shouldFetch(settings, loc, size, force)) {
       sendStatus('Map up to date');
-      sending = false;
+      finishSending();
       return;
     }
     resolveLabelCustomization(settings, function (labelCustomization) {
@@ -488,16 +518,14 @@ function performUpdate(force) {
   });
 }
 
-// Push a short status/debug line to the watch face. Only called at idle
-// moments (never interleaved with the image chunk stream) so it cannot
-// disrupt the ACK-driven transfer.
+// Push a short status/debug line to the watch face (via the serialised queue).
 function sendStatus(text) {
   console.log('Status: ' + text);
-  Pebble.sendAppMessage({ 'STATUS': text });
+  enqueueSend({ 'STATUS': text });
 }
 
 function sendConfigToWatch(dict, onDone) {
-  Pebble.sendAppMessage(dict, function () {
+  enqueueSend(dict, function () {
     console.log('Config sent to watch');
     if (onDone) { onDone(); }
   }, function () {
@@ -560,6 +588,15 @@ Pebble.addEventListener('appmessage', function (e) {
   if (e.payload && e.payload.REQUEST_UPDATE !== undefined) {
     // mode 2 = the watch asking for a forced re-download (e.g. after a
     // corrupt transfer); mode 1 = the hourly refresh.
-    performUpdate(e.payload.REQUEST_UPDATE === 2);
+    var force = e.payload.REQUEST_UPDATE === 2;
+    if (sending) {
+      // A transfer is finishing; remember the request so it isn't lost to the
+      // brief window before `sending` clears (which left the watch stuck on
+      // "Retrying").
+      pendingUpdate = true;
+      pendingForce = pendingForce || force;
+    } else {
+      performUpdate(force);
+    }
   }
 });
