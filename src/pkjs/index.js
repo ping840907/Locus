@@ -107,12 +107,12 @@ var PLATFORM_SIZES = {
   gabbro:  { w: 260, h: 260 } // round screen
 };
 
-// Palette size for the re-encoded indexed PNG, per platform. Memory for the
-// on-watch decode scales with this, so the small/low-RAM watches use 16
-// colours (a compact 4-bit PNG) while high-RAM emery gets a richer palette.
-var PLATFORM_COLORS = {
-  emery: 64
-};
+// Palette size for the re-encoded indexed PNG, per platform. The on-watch
+// decode footprint scales sharply with this: >16 colours forces an 8-bit
+// image, doubling the decoded bitmap and uPNG work buffers. 16 colours (a
+// compact 4-bit PNG) keeps the decode well within RAM even on emery's large
+// screen, and is plenty for the near-monochrome dark map.
+var PLATFORM_COLORS = {};
 
 // ---------------------------------------------------------------------------
 // Settings

@@ -240,6 +240,14 @@ static void finalize_image(void) {
 
   GBitmap *new_bitmap = NULL;
   if (ok) {
+    // Free the previous map BEFORE decoding the new one. Holding two
+    // full-screen bitmaps plus the PNG/decode buffers at once overflows RAM
+    // when reloading after a settings change (decode then fails -> the
+    // "Load failed" with an otherwise-valid PNG signature).
+    if (s_map_bitmap) {
+      gbitmap_destroy(s_map_bitmap);
+      s_map_bitmap = NULL;
+    }
     new_bitmap = gbitmap_create_from_png_data(s_img_buffer, s_img_size);
     if (!(new_bitmap && gbitmap_get_bounds(new_bitmap).size.w > 0)) {
       if (new_bitmap) {
@@ -252,10 +260,7 @@ static void finalize_image(void) {
   reset_image_stream();
 
   if (ok) {
-    if (s_map_bitmap) {
-      gbitmap_destroy(s_map_bitmap);
-    }
-    s_map_bitmap = new_bitmap;
+    s_map_bitmap = new_bitmap; // previous bitmap already freed above
     layer_mark_dirty(s_canvas_layer);
     set_status(""); // success: clear status for a clean face
     s_img_retries = 0;
