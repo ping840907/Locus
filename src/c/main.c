@@ -164,16 +164,27 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GColor shadow = GColorBlack;
 
-  // Larger displays (emery 200x228, gabbro 260x260) get bigger fonts.
-  bool large = bounds.size.w >= 200;
-  GFont time_font = fonts_get_system_font(
-      large ? FONT_KEY_LECO_60_NUMBERS_AM_PM : FONT_KEY_LECO_42_NUMBERS);
-  GFont date_font = fonts_get_system_font(
-      large ? FONT_KEY_GOTHIC_28 : FONT_KEY_GOTHIC_18_BOLD);
-
-  // Vertically center the time block.
-  int time_h = large ? 64 : 44;
-  int date_h = large ? 32 : 22;
+  // Larger displays (emery 200x228, gabbro 260x260) get bigger fonts. The
+  // LECO_60 font only exists in the SDK for those platforms, so guard its use
+  // with #ifdef to keep the other platforms compiling.
+  GFont time_font;
+  GFont date_font;
+  int time_h;
+  int date_h;
+#ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
+  if (bounds.size.w >= 200) {
+    time_font = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    time_h = 64;
+    date_h = 32;
+  } else
+#endif
+  {
+    time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+    time_h = 44;
+    date_h = 22;
+  }
   int block_h = s_show_date ? (time_h + 6 + date_h) : time_h;
   int top = bounds.origin.y + (bounds.size.h - block_h) / 2;
 
