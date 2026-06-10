@@ -5,19 +5,24 @@
 module.exports = function(minified) {
   var clayConfig = this;
 
+  function setVisible(item, visible) {
+    if (item) { visible ? item.show() : item.hide(); }
+  }
+
   // Show the fixed lat/lon only when "Use a fixed location" is selected, and
-  // hide the location-check interval in fixed mode (nothing moves, so there is
-  // nothing to re-check).
+  // hide the location-check interval and refresh distance in fixed mode
+  // (nothing moves, so there is nothing to re-check or re-download for).
   function toggleLocationItems() {
     var fixed = String(this.get()) === '1';
+    setVisible(clayConfig.getItemByMessageKey('FIXED_LAT'), fixed);
+    setVisible(clayConfig.getItemByMessageKey('FIXED_LON'), fixed);
+    setVisible(clayConfig.getItemByMessageKey('UPDATE_INTERVAL'), !fixed);
+    setVisible(clayConfig.getItemByMessageKey('UPDATE_DISTANCE'), !fixed);
+  }
 
-    var lat = clayConfig.getItemByMessageKey('FIXED_LAT');
-    var lon = clayConfig.getItemByMessageKey('FIXED_LON');
-    var interval = clayConfig.getItemByMessageKey('UPDATE_INTERVAL');
-
-    if (lat) { fixed ? lat.show() : lat.hide(); }
-    if (lon) { fixed ? lon.show() : lon.hide(); }
-    if (interval) { fixed ? interval.hide() : interval.show(); }
+  // Show the date colour only when the date is enabled.
+  function toggleDateColor() {
+    setVisible(clayConfig.getItemByMessageKey('DATE_COLOR'), this.get());
   }
 
   clayConfig.on(clayConfig.EVENTS.AFTER_BUILD, function() {
@@ -25,6 +30,12 @@ module.exports = function(minified) {
     if (modeItem) {
       toggleLocationItems.call(modeItem);   // set initial visibility
       modeItem.on('change', toggleLocationItems);
+    }
+
+    var dateItem = clayConfig.getItemByMessageKey('SHOW_DATE');
+    if (dateItem) {
+      toggleDateColor.call(dateItem);
+      dateItem.on('change', toggleDateColor);
     }
   });
 };
