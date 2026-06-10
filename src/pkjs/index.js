@@ -44,12 +44,25 @@ var DEFAULT_MAP_COLORS = [0x000000, 0x555555, 0xAAAAAA, 0xFFFFFF];
 // keyed by numeric message-key IDs for sendAppMessage, so we must read our
 // own settings from this localStorage entry, not from that dict.
 var CLAY_SETTINGS_KEY = 'clay-settings';
-var LAST_FETCH_KEY = 'mapface-lastfetch';
+var SRC_META_KEY = 'mapface-srcmeta';   // {lat, lon, sig} of the cached source
+var SRC_BYTES_KEY = 'mapface-src';      // cached Geoapify source PNG (bin string)
+var PREV_KEY = 'mapface-prev';          // snapshot of last-applied settings (diff)
 var CHUNK_SIZE = 1000; // bytes of image data per AppMessage
+
+// Which settings, when changed, require what:
+//   SOURCE  - the Geoapify image itself differs -> must refetch from the API
+//   RECOLOR - only the on-watch colours differ -> reuse cached source, no API
+// Anything else (time/date colour, toggles, interval, distance) is watch-only
+// or gating-only: just push config, no fetch and no re-stream.
+var SOURCE_KEYS = ['API_KEY', 'LOCATION_MODE', 'FIXED_LAT', 'FIXED_LON',
+                   'ZOOM', 'MAP_STYLE', 'SHOW_LABELS'];
+var RECOLOR_KEYS = ['MAP_COLOR_BG', 'MAP_COLOR_1', 'MAP_COLOR_2', 'MAP_COLOR_3',
+                    'MAP_TONE_BG', 'MAP_TONE_1', 'MAP_TONE_2', 'MAP_TONE_3'];
 
 var sending = false;        // a map transfer is in progress
 var pendingUpdate = false;  // an update was requested while sending
 var pendingForce = false;
+var pendingStream = false;
 
 // ---------------------------------------------------------------------------
 // Serialised AppMessage sender.
@@ -88,9 +101,10 @@ function finishSending() {
   sending = false;
   if (pendingUpdate) {
     pendingUpdate = false;
-    var f = pendingForce;
+    var f = pendingForce, s = pendingStream;
     pendingForce = false;
-    performUpdate(f);
+    pendingStream = false;
+    performUpdate(f, s);
   }
 }
 
@@ -410,34 +424,75 @@ function resolveStyleCustomization(settings, cb) {
 // Decide whether a refresh is needed
 // ---------------------------------------------------------------------------
 
+// Signature of the parameters that change the Geoapify SOURCE image.
 function fetchSignature(settings, size) {
   return [settings.LOCATION_MODE, settings.MAP_STYLE, settings.ZOOM,
           settings.SHOW_LABELS ? 1 : 0, size.w, size.h].join('|');
 }
 
-function shouldFetch(settings, loc, size, force) {
-  var last = null;
-  try { last = JSON.parse(localStorage.getItem(LAST_FETCH_KEY)); } catch (e) {}
+// ---- Phone-side source cache (avoids re-calling Geoapify) -----------------
+// We cache the raw Geoapify PNG so launches and colour changes can be served
+// by re-colouring the cached source instead of hitting the API again.
 
-  if (force || !last) { return true; }
-  if (last.sig !== fetchSignature(settings, size)) { return true; }
-
-  if (String(settings.LOCATION_MODE) === '1') {
-    // Fixed location: refresh only if the coordinates themselves changed.
-    return last.lat !== loc.lat || last.lon !== loc.lon;
+function bytesToBinStr(u8) {
+  var CHUNK = 0x8000, parts = [];
+  for (var i = 0; i < u8.length; i += CHUNK) {
+    parts.push(String.fromCharCode.apply(null, u8.subarray(i, i + CHUNK)));
   }
-
-  // Follow mode: refresh only when moved beyond the configured distance.
-  var moved = haversine(last.lat, last.lon, loc.lat, loc.lon);
-  return moved > (settings.UPDATE_DISTANCE || 500);
+  return parts.join('');
 }
 
-function rememberFetch(settings, loc, size) {
+function binStrToBytes(str) {
+  var u8 = new Uint8Array(str.length);
+  for (var i = 0; i < str.length; i++) { u8[i] = str.charCodeAt(i) & 0xFF; }
+  return u8;
+}
+
+function clearSource() {
   try {
-    localStorage.setItem(LAST_FETCH_KEY, JSON.stringify({
+    localStorage.removeItem(SRC_BYTES_KEY);
+    localStorage.removeItem(SRC_META_KEY);
+  } catch (e) {}
+}
+
+function saveSource(u8, settings, loc, size) {
+  try {
+    localStorage.setItem(SRC_BYTES_KEY, bytesToBinStr(u8));
+    localStorage.setItem(SRC_META_KEY, JSON.stringify({
       lat: loc.lat, lon: loc.lon, sig: fetchSignature(settings, size)
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.log('Source cache failed: ' + e);
+    clearSource(); // don't leave meta without bytes
+  }
+}
+
+function loadSourceBytes() {
+  var s = localStorage.getItem(SRC_BYTES_KEY);
+  return s === null ? null : binStrToBytes(s);
+}
+
+// True when the cached source still matches the wanted params and location, so
+// no new Geoapify call is needed.
+function sourceValid(settings, loc, size) {
+  if (localStorage.getItem(SRC_BYTES_KEY) === null) { return false; }
+  var m = null;
+  try { m = JSON.parse(localStorage.getItem(SRC_META_KEY)); } catch (e) {}
+  if (!m || m.sig !== fetchSignature(settings, size)) { return false; }
+  if (String(settings.LOCATION_MODE) === '1') {
+    return m.lat === loc.lat && m.lon === loc.lon;
+  }
+  return haversine(m.lat, m.lon, loc.lat, loc.lon) <=
+         (settings.UPDATE_DISTANCE || 500);
+}
+
+// Did any of the given keys change between the previous and current settings?
+function anyChanged(keys, oldS, newS) {
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (String(oldS[k]) !== String(newS[k])) { return true; }
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -481,7 +536,25 @@ function buildMapImage(arrayBuffer, render) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, styleCustomization, render) {
+// Re-colour an already-fetched source PNG and stream it to the watch. No API.
+function streamRecolored(arrayBuffer, render) {
+  var bytes;
+  try {
+    bytes = buildMapImage(arrayBuffer, render);
+  } catch (e) {
+    console.log('Recolour failed: ' + e);
+    sendStatus('Convert fail');
+    finishSending();
+    return;
+  }
+  console.log('Indexed PNG: ' + bytes.length + ' bytes');
+  streamImage(bytes, function (ok) {
+    if (!ok) { sendStatus('Transfer failed'); }
+    finishSending();
+  });
+}
+
+function fetchSourceAndSend(settings, loc, size, styleCustomization, render) {
   // POST request: the per-layer recolour customization is large, so it goes in
   // a JSON body (no URL-length limit, which truncated the GET version and made
   // roads hollow / dropped labels).
@@ -524,26 +597,11 @@ function downloadAndSend(settings, loc, size, styleCustomization, render) {
       return;
     }
 
-    // Reduce to 4 brightness levels and recolour with the user's palette,
-    // producing a small indexed PNG the watch can decode.
-    var bytes;
-    try {
-      bytes = buildMapImage(xhr.response, render);
-    } catch (convErr) {
-      console.log('PNG conversion failed: ' + convErr);
-      sendStatus('Convert fail');
-      finishSending();
-      return;
-    }
-    console.log('Indexed PNG: ' + bytes.length + ' bytes');
-    streamImage(bytes, function (ok) {
-      if (ok) {
-        rememberFetch(settings, loc, size);
-      } else {
-        sendStatus('Transfer failed');
-      }
-      finishSending();
-    });
+    // Cache the raw source so future launches / colour changes can reuse it
+    // without another API call, then recolour and stream it.
+    var src = new Uint8Array(xhr.response);
+    saveSource(src, settings, loc, size);
+    streamRecolored(xhr.response, render);
   };
   xhr.onerror = function () {
     console.log('Map request network error (status ' + xhr.status + ')');
@@ -589,7 +647,12 @@ function streamImage(bytes, done) {
 // Orchestration
 // ---------------------------------------------------------------------------
 
-function performUpdate(force) {
+// force       - force a Geoapify refetch (source-affecting change / API key).
+// streamCache - if no fetch is needed, still re-stream the cached source
+//               (used on launch and recolour changes so the watch gets an
+//               image without an API call). If false and nothing changed, do
+//               nothing (the watch keeps showing its current map).
+function performUpdate(force, streamCache) {
   if (sending) { return; }
   var settings = loadSettings();
 
@@ -614,14 +677,30 @@ function performUpdate(force) {
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
     if (err) { sendStatus('No location'); finishSending(); return; }
-    if (!shouldFetch(settings, loc, size, force)) {
-      sendStatus('Map up to date');
-      finishSending();
+
+    var needFetch = force || !sourceValid(settings, loc, size);
+    if (needFetch) {
+      resolveStyleCustomization(settings, function (styleCustomization) {
+        fetchSourceAndSend(settings, loc, size, styleCustomization, render);
+      });
       return;
     }
-    resolveStyleCustomization(settings, function (styleCustomization) {
-      downloadAndSend(settings, loc, size, styleCustomization, render);
-    });
+    if (streamCache) {
+      // Reuse the cached source — recolour and stream, no Geoapify call.
+      var u8 = loadSourceBytes();
+      if (u8) {
+        console.log('Reusing cached map source (no API call)');
+        streamRecolored(u8.buffer, render);
+      } else {
+        // Cache vanished unexpectedly; fetch as a fallback.
+        resolveStyleCustomization(settings, function (styleCustomization) {
+          fetchSourceAndSend(settings, loc, size, styleCustomization, render);
+        });
+      }
+      return;
+    }
+    sendStatus('Map up to date');
+    finishSending();
   });
 }
 
@@ -647,9 +726,9 @@ function sendConfigToWatch(dict, onDone) {
 
 Pebble.addEventListener('ready', function () {
   console.log('Map Face JS ready');
-  // Force on launch: the watch does not persist the decoded map, so it needs
-  // a fresh image every time the watchface starts.
-  performUpdate(true);
+  // On launch the watch has no map, so stream one — but reuse the cached source
+  // (no API call) unless it's missing/stale.
+  performUpdate(false, true);
 });
 
 Pebble.addEventListener('showConfiguration', function () {
@@ -663,6 +742,10 @@ Pebble.addEventListener('webviewclosed', function (e) {
     return;
   }
 
+  // Snapshot the previous settings BEFORE getSettings overwrites clay-settings,
+  // so we can diff message-key values to decide what (if anything) to refetch.
+  var oldS = loadSettings();
+
   var dict;
   try {
     // getSettings also writes the clean, name-keyed copy to clay-settings.
@@ -673,37 +756,47 @@ Pebble.addEventListener('webviewclosed', function (e) {
     return;
   }
 
-  // Read our own settings (API key, mode, etc.) from the clean copy.
-  var settings = loadSettings();
-  var keyLen = settings.API_KEY ? String(settings.API_KEY).length : 0;
+  var newS = loadSettings();
+  var keyLen = newS.API_KEY ? String(newS.API_KEY).length : 0;
+  var sourceChanged = anyChanged(SOURCE_KEYS, oldS, newS);
+  var recolorChanged = anyChanged(RECOLOR_KEYS, oldS, newS);
+  console.log('Config saved: sourceChanged=' + sourceChanged +
+              ', recolorChanged=' + recolorChanged);
 
-  // Send the config first, and only start the image transfer once it has been
-  // acked. Sending config and streaming the image concurrently makes the two
-  // AppMessage flows collide and corrupts the image (a single flipped byte in
-  // the PNG, seen as "Load failed"/decode failure on the watch).
+  // Send the config first, and only start any transfer once it has been acked
+  // (concurrent config + image streams corrupt the image).
   sendConfigToWatch(dict, function () {
     if (!keyLen) {
       sendStatus('Cfg: key empty');
       return;
     }
-    // Config (key / style / zoom / location) may have changed: force a refresh.
-    performUpdate(true);
+    if (sourceChanged) {
+      // The map image itself differs -> refetch from Geoapify.
+      performUpdate(true, true);
+    } else if (recolorChanged) {
+      // Only colours/tones changed -> recolour the cached source, no API call.
+      performUpdate(false, true);
+    }
+    // Otherwise only watch-side / gating settings changed: config already sent,
+    // nothing to fetch or re-stream.
   });
 });
 
 Pebble.addEventListener('appmessage', function (e) {
   if (e.payload && e.payload.REQUEST_UPDATE !== undefined) {
-    // mode 2 = the watch asking for a forced re-download (e.g. after a
-    // corrupt transfer); mode 1 = the hourly refresh.
-    var force = e.payload.REQUEST_UPDATE === 2;
+    // mode 1 = periodic check: fetch only if moved beyond the refresh distance.
+    // mode 2 = the watch hit a corrupt transfer: re-stream from the cached
+    //          source (re-encodes + re-sends, no API call) and only fetch if
+    //          there is no cache.
+    var stream = e.payload.REQUEST_UPDATE === 2;
     if (sending) {
       // A transfer is finishing; remember the request so it isn't lost to the
       // brief window before `sending` clears (which left the watch stuck on
       // "Retrying").
       pendingUpdate = true;
-      pendingForce = pendingForce || force;
+      pendingStream = pendingStream || stream;
     } else {
-      performUpdate(force);
+      performUpdate(false, stream);
     }
   }
 });

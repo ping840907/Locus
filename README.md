@@ -51,8 +51,16 @@ Pebble cannot fetch or process map imagery itself, so the work is split:
   ~1 KB at a time, reassembled, signature-checked, and decoded with
   `gbitmap_create_from_png_data` (with a bounded auto-retry on corruption).
 * **Refresh cadence** — the watch asks the phone for an update on a configurable
-  interval (and on launch / whenever settings are saved). The phone only
-  re-downloads the map if you have moved beyond the configured distance.
+  interval (and on launch / whenever settings are saved).
+* **Source caching (fewer API calls)** — the phone caches the last Geoapify PNG
+  (in `localStorage`) with the params it was fetched for. It only calls Geoapify
+  again when the *source* image would actually differ: a source-affecting
+  setting changed (zoom, style, labels, API key, location mode/coords) or you
+  moved beyond the refresh distance. Launches, colour/tone changes, watch-only
+  setting changes and transfer retries all reuse the cached source (re-coloured
+  on the phone, no API call). On a settings save the phone diffs the changed
+  message keys to classify the change: source → refetch, recolour → reuse
+  cache, watch-only → just push config.
 
 ### On-watch status line
 
@@ -181,5 +189,5 @@ requests/day on the free tier). The map appears once a location is resolved.
 * Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
   (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
   actual resolution differs).
-* Geoapify free-tier usage: hourly checks + distance-gated downloads keep
+* Geoapify free-tier usage: source caching + distance-gated downloads keep
   requests well within 3,000/day.
