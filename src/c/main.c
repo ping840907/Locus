@@ -181,7 +181,7 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
 #endif
   {
     time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
     time_h = 44;
     date_h = 22;
   }
