@@ -62,7 +62,14 @@
       "IMG_ERROR"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "type": "png",
+          "name": "IMAGE_MENU_ICON",
+          "file": "images/icon-25.png",
+          "menuIcon": true
+        }
+      ]
     },
     "capabilities": [
       "location",
