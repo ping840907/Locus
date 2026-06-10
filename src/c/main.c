@@ -174,14 +174,14 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
   if (bounds.size.w >= 200) {
     time_font = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
-    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
     time_h = 64;
     date_h = 32;
   } else
 #endif
   {
     time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
     time_h = 44;
     date_h = 22;
   }
