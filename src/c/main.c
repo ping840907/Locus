@@ -164,12 +164,16 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GColor shadow = GColorBlack;
 
-  GFont time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-  GFont date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+  // Larger displays (emery 200x228, gabbro 260x260) get bigger fonts.
+  bool large = bounds.size.w >= 200;
+  GFont time_font = fonts_get_system_font(
+      large ? FONT_KEY_LECO_60_NUMBERS_AM_PM : FONT_KEY_LECO_42_NUMBERS);
+  GFont date_font = fonts_get_system_font(
+      large ? FONT_KEY_GOTHIC_28 : FONT_KEY_GOTHIC_18_BOLD);
 
   // Vertically center the time block.
-  int time_h = 44;
-  int date_h = 22;
+  int time_h = large ? 64 : 44;
+  int date_h = large ? 32 : 22;
   int block_h = s_show_date ? (time_h + 6 + date_h) : time_h;
   int top = bounds.origin.y + (bounds.size.h - block_h) / 2;
 
