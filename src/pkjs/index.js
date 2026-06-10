@@ -407,16 +407,20 @@ function rememberFetch(settings, loc, size) {
 }
 
 // ---------------------------------------------------------------------------
-// PNG conversion: reduce the Geoapify map to 4 brightness levels and paint
-// each level with the user's palette colour, producing a 2-bit indexed PNG
-// the watch can decode cheaply.
+// PNG conversion. Produces two images from the Geoapify map:
+//   full        - 4 brightness levels painted with the user's palette (2-bit
+//                 indexed PNG), shown live.
+//   placeholder - a 1-bit (land vs roads) version, tiny enough to fit the
+//                 watch's 4 KB persistent storage; cached and shown on launch.
+// Encoded losslessly (cnum 0) so the exact palettes are preserved.
 // ---------------------------------------------------------------------------
 
-function recolorToPalette(arrayBuffer, palette) {
+function buildMapImages(arrayBuffer, palette) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var w = decoded.width, h = decoded.height;
   console.log('Geoapify returned ' + w + 'x' + h);
   var px = new Uint8Array(UPNG.toRGBA8(decoded)[0]); // first frame, RGBA bytes
+  var ph = new Uint8Array(px.length);               // placeholder RGBA
 
   for (var i = 0; i < px.length; i += 4) {
     // Geoapify rendered each layer group as one of 4 greys; snap to the
@@ -428,13 +432,16 @@ function recolorToPalette(arrayBuffer, palette) {
     else if (lum >= LEVEL_THRESHOLDS[0]) { level = 1; }
     var c = palette[level];
     px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b; px[i + 3] = 255;
+    // Placeholder: land keeps the background colour; everything else (water,
+    // roads, labels) becomes the roads colour -> only 2 colours.
+    var pc = (level === 0) ? palette[0] : palette[2];
+    ph[i] = pc.r; ph[i + 1] = pc.g; ph[i + 2] = pc.b; ph[i + 3] = 255;
   }
 
-  // The image now contains at most 4 distinct colours. Encode losslessly
-  // (cnum 0) so UPNG keeps that exact palette - a colour-count quantiser can
-  // merge a sparse level (e.g. labels) and lose its colour.
-  var out = UPNG.encode([px.buffer], w, h, 0);
-  return new Uint8Array(out);
+  return {
+    full: new Uint8Array(UPNG.encode([px.buffer], w, h, 0)),
+    placeholder: new Uint8Array(UPNG.encode([ph.buffer], w, h, 0))
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -484,27 +491,31 @@ function downloadAndSend(settings, loc, size, styleCustomization, palette) {
       return;
     }
 
-    // Reduce to 4 brightness levels and recolour with the user's palette,
-    // producing a small 2-bit indexed PNG the watch can decode.
-    var bytes;
+    // Build the full (4-colour, shown live) and placeholder (1-bit, cached for
+    // the launch screen) images.
+    var imgs;
     try {
-      bytes = recolorToPalette(xhr.response, palette);
+      imgs = buildMapImages(xhr.response, palette);
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
       finishSending();
       return;
     }
-    console.log('Indexed PNG: ' + bytes.length + ' bytes');
-    // The watch shows "Loading map..." on IMG_SIZE and clears it on a
-    // successful decode, so no status is sent here.
-    streamImage(bytes, function (ok) {
-      if (ok) {
-        rememberFetch(settings, loc, size);
-      } else {
+    console.log('Full PNG: ' + imgs.full.length + ' B, placeholder: ' +
+                imgs.placeholder.length + ' B');
+    // Stream the full image (kind 0 = display); on success, stream the tiny
+    // placeholder (kind 1 = persist on the watch for next launch).
+    streamImage(imgs.full, 0, function (ok) {
+      if (!ok) {
         sendStatus('Transfer failed');
+        finishSending();
+        return;
       }
-      finishSending();
+      rememberFetch(settings, loc, size);
+      streamImage(imgs.placeholder, 1, function () {
+        finishSending();
+      });
     });
   };
   xhr.onerror = function () {
@@ -527,19 +538,20 @@ function downloadAndSend(settings, loc, size, styleCustomization, palette) {
   }
 }
 
-function streamImage(bytes, done) {
+function streamImage(bytes, kind, done) {
   var size = bytes.length;
 
   // Enqueue the whole transfer; the serialised queue sends one message at a
   // time, in order, so chunks never overlap each other or other traffic.
-  enqueueSend({ 'IMG_SIZE': size });
+  // IMG_KIND: 0 = full image to display, 1 = placeholder to persist.
+  enqueueSend({ 'IMG_SIZE': size, 'IMG_KIND': kind });
   for (var offset = 0; offset < size; offset += CHUNK_SIZE) {
     var end = Math.min(offset + CHUNK_SIZE, size);
     var chunk = Array.prototype.slice.call(bytes.subarray(offset, end));
     enqueueSend({ 'IMG_OFFSET': offset, 'IMG_DATA': chunk });
   }
   enqueueSend({ 'IMG_COMPLETE': 1 }, function () {
-    console.log('Image transfer complete');
+    console.log('Image transfer complete (kind ' + kind + ')');
     done(true);
   }, function () {
     console.log('Image transfer failed to complete');

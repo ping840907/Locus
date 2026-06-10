@@ -52,6 +52,7 @@ static GBitmap *s_map_bitmap = NULL;
 static uint8_t *s_img_buffer = NULL;
 static uint32_t s_img_size = 0;
 static uint32_t s_img_received = 0;
+static uint8_t s_img_kind = 0; // 0 = full (display), 1 = placeholder (persist)
 
 // Bounded retry when a received image is incomplete/corrupt.
 #define MAX_IMG_RETRIES 2
@@ -324,6 +325,24 @@ static void finalize_image(void) {
   bool ok = (recv >= total) && total >= 8 &&
             b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47;
 
+  // Placeholder image (kind 1): cache it for the launch screen, don't display.
+  // Only rewrite storage when it actually changed (hash differs), to avoid
+  // needless flash writes on identical forced/periodic refreshes.
+  if (s_img_kind == 1) {
+    if (ok) {
+      uint32_t h = png_hash(s_img_buffer, s_img_size);
+      bool unchanged = persist_exists(PERSIST_MAP_SIZE) &&
+                       persist_exists(PERSIST_MAP_HASH) &&
+                       (uint32_t)persist_read_int(PERSIST_MAP_HASH) == h;
+      if (!unchanged && persist_map(s_img_buffer, s_img_size)) {
+        persist_write_int(PERSIST_MAP_HASH, (int)h);
+      }
+    }
+    reset_image_stream();
+    return;
+  }
+
+  // Full image (kind 0): decode and display (not persisted).
   GBitmap *new_bitmap = NULL;
   if (ok) {
     // Free the previous map BEFORE decoding the new one. Holding two
@@ -341,22 +360,6 @@ static void finalize_image(void) {
         new_bitmap = NULL;
       }
       ok = false;
-    }
-  }
-
-  // Cache the PNG (while the buffer is still allocated) so it can be shown on
-  // the next launch instead of a black screen. Only rewrite persistent storage
-  // when the map actually changed (its hash differs from what is cached), to
-  // avoid needless flash writes on identical forced/periodic refreshes.
-  if (ok) {
-    uint32_t h = png_hash(s_img_buffer, s_img_size);
-    bool unchanged = persist_exists(PERSIST_MAP_SIZE) &&
-                     persist_exists(PERSIST_MAP_HASH) &&
-                     (uint32_t)persist_read_int(PERSIST_MAP_HASH) == h;
-    if (!unchanged) {
-      if (persist_map(s_img_buffer, s_img_size)) {
-        persist_write_int(PERSIST_MAP_HASH, (int)h);
-      }
     }
   }
   reset_image_stream();
@@ -459,13 +462,15 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (size_t) {
     reset_image_stream();
     s_img_size = size_t->value->uint32;
+    Tuple *kind_t = dict_find(iter, MESSAGE_KEY_IMG_KIND);
+    s_img_kind = kind_t ? (uint8_t)kind_t->value->uint32 : 0;
     if (s_img_size > 0 && s_img_size < 256 * 1024) {
       s_img_buffer = malloc(s_img_size);
     }
     if (!s_img_buffer) {
       s_img_size = 0; // allocation failed; ignore the incoming stream
       set_status("Img buffer fail");
-    } else {
+    } else if (s_img_kind == 0) {
       set_status("Loading map...");
     }
     return;
