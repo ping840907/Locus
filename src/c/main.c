@@ -23,6 +23,8 @@
 #define PERSIST_SHOW_DATE       103
 #define PERSIST_SHOW_CENTER_DOT 104
 #define PERSIST_UPDATE_INTERVAL 105
+#define PERSIST_LOCATION_MODE   106  // 0 = follow current, 1 = fixed location
+#define PERSIST_SHOW_STATUS     107
 
 // Persisted copy of the last map PNG, so the previous map can be shown on
 // launch instead of a black screen while a fresh one loads. The app has 4 KB
@@ -41,6 +43,7 @@
 #define DEFAULT_SHOW_DATE       true
 #define DEFAULT_SHOW_CENTER_DOT true
 #define DEFAULT_UPDATE_INTERVAL 60       // minutes between location checks
+#define DEFAULT_SHOW_STATUS     true
 
 static Window *s_window;
 static Layer *s_canvas_layer;     // draws bg + map + center dot
@@ -66,6 +69,8 @@ static bool s_show_date = DEFAULT_SHOW_DATE;
 static bool s_show_center_dot = DEFAULT_SHOW_CENTER_DOT;
 static int s_update_interval = DEFAULT_UPDATE_INTERVAL; // minutes
 static int s_minutes_since_update = 0;
+static bool s_fixed_location = false; // no periodic refresh when fixed
+static bool s_show_status = DEFAULT_SHOW_STATUS;
 
 // Cached time strings
 static char s_time_buf[8];
@@ -205,8 +210,8 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
                           s_date_color, shadow, GTextAlignmentCenter);
   }
 
-  // Status / debug line at the bottom (only when there is something to show).
-  if (s_status[0] != '\0') {
+  // Status / debug line at the bottom (only when enabled and non-empty).
+  if (s_show_status && s_status[0] != '\0') {
     GFont status_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
     GRect status_box = GRect(bounds.origin.x + 4,
                              bounds.origin.y + bounds.size.h - 22,
@@ -429,6 +434,20 @@ static void apply_config(DictionaryIterator *iter) {
     persist_write_int(PERSIST_UPDATE_INTERVAL, s_update_interval);
     s_minutes_since_update = 0; // restart the cycle with the new interval
   }
+  t = dict_find(iter, MESSAGE_KEY_LOCATION_MODE);
+  if (t) {
+    // Clay sends the select value as a string ("0"/"1"); be tolerant of int.
+    int mode = (t->type == TUPLE_CSTRING) ? atoi(t->value->cstring)
+                                          : t->value->int32;
+    s_fixed_location = (mode == 1);
+    persist_write_bool(PERSIST_LOCATION_MODE, s_fixed_location);
+  }
+  t = dict_find(iter, MESSAGE_KEY_SHOW_STATUS);
+  if (t) {
+    s_show_status = t->value->int32 != 0;
+    persist_write_bool(PERSIST_SHOW_STATUS, s_show_status);
+    changed = true;
+  }
 
   if (changed) {
     layer_mark_dirty(s_canvas_layer);
@@ -450,6 +469,10 @@ static void load_persisted_config(void) {
   s_update_interval = persist_exists(PERSIST_UPDATE_INTERVAL)
       ? persist_read_int(PERSIST_UPDATE_INTERVAL) : DEFAULT_UPDATE_INTERVAL;
   if (s_update_interval < 1) { s_update_interval = 1; }
+  s_fixed_location = persist_exists(PERSIST_LOCATION_MODE)
+      ? persist_read_bool(PERSIST_LOCATION_MODE) : false;
+  s_show_status = persist_exists(PERSIST_SHOW_STATUS)
+      ? persist_read_bool(PERSIST_SHOW_STATUS) : DEFAULT_SHOW_STATUS;
 }
 
 // ---------------------------------------------------------------------------
@@ -518,12 +541,16 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time_strings();
   layer_mark_dirty(s_overlay_layer);
 
-  // Ask the phone for a location/map check every configured interval. The
-  // phone still only re-downloads when moved beyond the refresh distance.
-  s_minutes_since_update++;
-  if (s_minutes_since_update >= s_update_interval) {
-    s_minutes_since_update = 0;
-    send_update_request(1);
+  // In fixed-location mode there is nothing to re-check, so skip the periodic
+  // refresh entirely. Otherwise ask the phone for a location/map check every
+  // configured interval (the phone still only re-downloads when moved beyond
+  // the refresh distance).
+  if (!s_fixed_location) {
+    s_minutes_since_update++;
+    if (s_minutes_since_update >= s_update_interval) {
+      s_minutes_since_update = 0;
+      send_update_request(1);
+    }
   }
 }
 

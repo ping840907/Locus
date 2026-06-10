@@ -223,6 +223,16 @@ module.exports = [
         "messageKey": "SHOW_CENTER_DOT",
         "label": "Show location dot",
         "defaultValue": true
+      },
+      {
+        "type": "toggle",
+        "messageKey": "SHOW_STATUS",
+        "label": "Show status messages",
+        "defaultValue": true
+      },
+      {
+        "type": "text",
+        "defaultValue": "Status messages appear at the bottom (e.g. Locating, Loading map). Turn off for a clean face."
       }
     ]
   },

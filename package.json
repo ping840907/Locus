@@ -48,6 +48,7 @@
       "BG_COLOR",
       "SHOW_DATE",
       "SHOW_CENTER_DOT",
+      "SHOW_STATUS",
       "REQUEST_UPDATE",
       "STATUS",
       "IMG_SIZE",

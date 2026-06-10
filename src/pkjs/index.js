@@ -4,14 +4,16 @@
 //   * Host the Clay configuration page.
 //   * Resolve the user's location (prioritising fast WiFi / cell-tower
 //     positioning, with a Geoapify IP fallback).
-//   * Decide hourly whether the map needs to be re-downloaded (only when the
-//     user has moved farther than the configured refresh distance).
+//   * Decide on each check whether the map needs re-downloading (only when the
+//     user has moved farther than the configured refresh distance; fixed mode
+//     doesn't auto-refresh).
 //   * Download the Geoapify monochrome static map (PNG) and stream it to the
 //     watch in chunks over AppMessage.
 
 var Clay = require('@rebble/clay');
 var clayConfig = require('./config');
-var clay = new Clay(clayConfig, null, { autoHandleEvents: false });
+var customClay = require('./custom-clay');
+var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 
 // UPNG (with pako) lets us decode Geoapify's 24-bit truecolor PNG and
 // re-encode it as a palettized indexed PNG, which is the only kind Pebble's
