@@ -55,7 +55,6 @@
       "IMG_OFFSET",
       "IMG_DATA",
       "IMG_COMPLETE",
-      "IMG_KIND",
       "IMG_ERROR"
     ],
     "resources": {

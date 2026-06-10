@@ -26,16 +26,6 @@
 #define PERSIST_LOCATION_MODE   106  // 0 = follow current, 1 = fixed location
 #define PERSIST_SHOW_STATUS     107
 
-// Persisted copy of the last map PNG, so the previous map can be shown on
-// launch instead of a black screen while a fresh one loads. The app has 4 KB
-// of persistent storage and each field holds at most 256 bytes, so the PNG is
-// stored across chunk keys and only cached when it fits.
-#define PERSIST_MAP_SIZE        110
-#define PERSIST_MAP_HASH        111  // hash of the cached PNG (to skip rewrites)
-#define PERSIST_MAP_CHUNK_BASE  120  // chunk keys 120 .. 120+MAX_MAP_CHUNKS-1
-#define MAX_MAP_CHUNKS          14   // 14 * 256 = 3584 bytes (leaves room in 4KB)
-#define MAP_CHUNK_LEN           256
-
 // Defaults (dark theme to match the dark-matter map style)
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
 #define DEFAULT_DATE_COLOR      0xAAAAAA // light grey
@@ -55,7 +45,6 @@ static GBitmap *s_map_bitmap = NULL;
 static uint8_t *s_img_buffer = NULL;
 static uint32_t s_img_size = 0;
 static uint32_t s_img_received = 0;
-static uint8_t s_img_kind = 0; // 0 = full (display), 1 = placeholder (persist)
 
 // Bounded retry when a received image is incomplete/corrupt.
 #define MAX_IMG_RETRIES 2
@@ -225,82 +214,6 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
 // Image stream handling
 // ---------------------------------------------------------------------------
 
-// Persist the last map PNG across chunk keys so it can be restored on launch.
-// Writes the chunks first and the size last, so a partial/failed write (e.g.
-// over the 4KB quota) leaves no "valid" cached map. No allocations here.
-static void clear_persisted_map(void) {
-  persist_delete(PERSIST_MAP_SIZE);
-  persist_delete(PERSIST_MAP_HASH);
-  for (int i = 0; i < MAX_MAP_CHUNKS; i++) {
-    persist_delete(PERSIST_MAP_CHUNK_BASE + i);
-  }
-}
-
-// Cheap FNV-1a hash of the PNG bytes, used to detect whether the map changed.
-static uint32_t png_hash(const uint8_t *data, uint32_t size) {
-  uint32_t h = 2166136261u;
-  for (uint32_t i = 0; i < size; i++) {
-    h ^= data[i];
-    h *= 16777619u;
-  }
-  return h;
-}
-
-// Returns true if a valid cache was written.
-static bool persist_map(const uint8_t *data, uint32_t size) {
-  if (size == 0 || size > (uint32_t)(MAX_MAP_CHUNKS * MAP_CHUNK_LEN)) {
-    clear_persisted_map(); // too big to cache; drop any old copy
-    return false;
-  }
-  uint32_t chunks = (size + MAP_CHUNK_LEN - 1) / MAP_CHUNK_LEN;
-  uint32_t off = 0;
-  for (uint32_t i = 0; i < chunks; i++, off += MAP_CHUNK_LEN) {
-    uint32_t len = (size - off < MAP_CHUNK_LEN) ? (size - off) : MAP_CHUNK_LEN;
-    int written = persist_write_data(PERSIST_MAP_CHUNK_BASE + i, data + off, len);
-    if (written < (int)len) {
-      clear_persisted_map(); // quota exceeded; invalidate the whole copy
-      return false;
-    }
-  }
-  // Drop leftover chunks from a previously larger map to reclaim quota.
-  for (uint32_t i = chunks; i < MAX_MAP_CHUNKS; i++) {
-    persist_delete(PERSIST_MAP_CHUNK_BASE + i);
-  }
-  persist_write_int(PERSIST_MAP_SIZE, (int)size);
-  return true;
-}
-
-// Restore the persisted map into s_map_bitmap (called on launch). Frees its
-// temporary buffer in all paths.
-static void load_persisted_map(void) {
-  if (!persist_exists(PERSIST_MAP_SIZE)) { return; }
-  int size = persist_read_int(PERSIST_MAP_SIZE);
-  if (size <= 0 || size > MAX_MAP_CHUNKS * MAP_CHUNK_LEN) { return; }
-
-  uint8_t *buf = malloc(size);
-  if (!buf) { return; }
-
-  bool ok = true;
-  uint32_t off = 0;
-  for (uint32_t i = 0; off < (uint32_t)size; i++, off += MAP_CHUNK_LEN) {
-    uint32_t len = ((uint32_t)size - off < MAP_CHUNK_LEN)
-                       ? ((uint32_t)size - off) : MAP_CHUNK_LEN;
-    int read = persist_read_data(PERSIST_MAP_CHUNK_BASE + i, buf + off, len);
-    if (read < (int)len) { ok = false; break; }
-  }
-
-  if (ok) {
-    GBitmap *bmp = gbitmap_create_from_png_data(buf, size);
-    if (bmp && gbitmap_get_bounds(bmp).size.w > 0) {
-      if (s_map_bitmap) { gbitmap_destroy(s_map_bitmap); }
-      s_map_bitmap = bmp;
-    } else if (bmp) {
-      gbitmap_destroy(bmp);
-    }
-  }
-  free(buf);
-}
-
 static void reset_image_stream(void) {
   if (s_img_buffer) {
     free(s_img_buffer);
@@ -330,24 +243,6 @@ static void finalize_image(void) {
   bool ok = (recv >= total) && total >= 8 &&
             b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47;
 
-  // Placeholder image (kind 1): cache it for the launch screen, don't display.
-  // Only rewrite storage when it actually changed (hash differs), to avoid
-  // needless flash writes on identical forced/periodic refreshes.
-  if (s_img_kind == 1) {
-    if (ok) {
-      uint32_t h = png_hash(s_img_buffer, s_img_size);
-      bool unchanged = persist_exists(PERSIST_MAP_SIZE) &&
-                       persist_exists(PERSIST_MAP_HASH) &&
-                       (uint32_t)persist_read_int(PERSIST_MAP_HASH) == h;
-      if (!unchanged && persist_map(s_img_buffer, s_img_size)) {
-        persist_write_int(PERSIST_MAP_HASH, (int)h);
-      }
-    }
-    reset_image_stream();
-    return;
-  }
-
-  // Full image (kind 0): decode and display (not persisted).
   GBitmap *new_bitmap = NULL;
   if (ok) {
     // Free the previous map BEFORE decoding the new one. Holding two
@@ -485,15 +380,13 @@ static void inbox_received_handler(DictionaryIterator *iter, void *context) {
   if (size_t) {
     reset_image_stream();
     s_img_size = size_t->value->uint32;
-    Tuple *kind_t = dict_find(iter, MESSAGE_KEY_IMG_KIND);
-    s_img_kind = kind_t ? (uint8_t)kind_t->value->uint32 : 0;
     if (s_img_size > 0 && s_img_size < 256 * 1024) {
       s_img_buffer = malloc(s_img_size);
     }
     if (!s_img_buffer) {
       s_img_size = 0; // allocation failed; ignore the incoming stream
       set_status("Img buffer fail");
-    } else if (s_img_kind == 0) {
+    } else {
       set_status("Loading map...");
     }
     return;
@@ -569,10 +462,6 @@ static void window_load(Window *window) {
   s_overlay_layer = layer_create(bounds);
   layer_set_update_proc(s_overlay_layer, overlay_update_proc);
   layer_add_child(root, s_overlay_layer);
-
-  // Show the previously cached map immediately (avoids a black screen while a
-  // fresh one is fetched).
-  load_persisted_map();
 
   update_time_strings();
 }
