@@ -38,19 +38,7 @@ module.exports = function(minified) {
       dateItem.on('change', toggleDateColor);
     }
 
-    // Black & white platforms can't show colours, so offer dither/line tones
-    // instead of colour pickers for the four map layers.
-    var info = clayConfig.meta && clayConfig.meta.activeWatchInfo;
-    var platform = (info && info.platform) || 'basalt';
-    var bw = platform === 'aplite' || platform === 'diorite' ||
-             platform === 'flint';
-    var colorKeys = ['MAP_COLOR_BG', 'MAP_COLOR_1', 'MAP_COLOR_2', 'MAP_COLOR_3'];
-    var toneKeys = ['MAP_TONE_BG', 'MAP_TONE_1', 'MAP_TONE_2', 'MAP_TONE_3'];
-    colorKeys.forEach(function(k) {
-      setVisible(clayConfig.getItemByMessageKey(k), !bw);
-    });
-    toneKeys.forEach(function(k) {
-      setVisible(clayConfig.getItemByMessageKey(k), bw);
-    });
+    // The colour pickers (COLOR) vs tone selects (BW) are shown per platform by
+    // Clay's own `capabilities` field on those items - no custom code needed.
   });
 };

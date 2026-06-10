@@ -164,34 +164,39 @@ module.exports = [
         "messageKey": "MAP_COLOR_BG",
         "label": "Land / background",
         "defaultValue": "000000",
-        "sunlight": true
+        "sunlight": true,
+        "capabilities": ["COLOR"]
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_1",
         "label": "Water",
         "defaultValue": "555555",
-        "sunlight": true
+        "sunlight": true,
+        "capabilities": ["COLOR"]
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_2",
         "label": "Roads",
         "defaultValue": "AAAAAA",
-        "sunlight": true
+        "sunlight": true,
+        "capabilities": ["COLOR"]
       },
       {
         "type": "color",
         "messageKey": "MAP_COLOR_3",
         "label": "Labels",
         "defaultValue": "FFFFFF",
-        "sunlight": true
+        "sunlight": true,
+        "capabilities": ["COLOR"]
       },
       {
         "type": "select",
         "messageKey": "MAP_TONE_BG",
         "label": "Land / background",
         "defaultValue": "0",
+        "capabilities": ["BW"],
         "options": [
           { "label": "Black", "value": "0" },
           { "label": "White", "value": "1" },
@@ -204,6 +209,7 @@ module.exports = [
         "messageKey": "MAP_TONE_1",
         "label": "Water",
         "defaultValue": "3",
+        "capabilities": ["BW"],
         "options": [
           { "label": "Black", "value": "0" },
           { "label": "White", "value": "1" },
@@ -216,6 +222,7 @@ module.exports = [
         "messageKey": "MAP_TONE_2",
         "label": "Roads",
         "defaultValue": "2",
+        "capabilities": ["BW"],
         "options": [
           { "label": "Black", "value": "0" },
           { "label": "White", "value": "1" },
@@ -228,6 +235,7 @@ module.exports = [
         "messageKey": "MAP_TONE_3",
         "label": "Labels",
         "defaultValue": "1",
+        "capabilities": ["BW"],
         "options": [
           { "label": "Black", "value": "0" },
           { "label": "White", "value": "1" },
