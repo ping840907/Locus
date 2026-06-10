@@ -117,26 +117,22 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, s_bg_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
-  // Map background. The Geoapify attribution band (two lines) is baked onto
-  // the bottom edge of the returned image, which we request taller than the
-  // screen. We shift the image up by ATTR_PUSH so its bottom edge (with the
-  // attribution) is pushed past the screen's bottom edge. ATTR_PUSH matches
-  // the per-side extra height requested by the phone, so the location (image
-  // centre) ends up at the screen centre.
+  // Map background. The phone requests the image taller than the screen (extra
+  // margin on every side) with the location at its exact centre. We draw it
+  // centred on both axes, so the location always lands at the screen centre on
+  // every platform (144x168, 180x180 chalk, 260x260 gabbro, ...). The extra
+  // margin is cropped away by the screen edges, which also removes the
+  // Geoapify attribution band baked onto the bottom edge.
   GPoint loc_point = grect_center_point(&bounds);
   if (s_map_bitmap) {
-    const int ATTR_PUSH = 60;
     GRect img = gbitmap_get_bounds(s_map_bitmap);
-    int origin_x = bounds.origin.x + (bounds.size.w - img.size.w) / 2;
-    int origin_y = bounds.origin.y + bounds.size.h + ATTR_PUSH - img.size.h;
-
-    GRect dest = GRect(origin_x, origin_y, img.size.w, img.size.h);
+    GRect dest = GRect(bounds.origin.x + (bounds.size.w - img.size.w) / 2,
+                       bounds.origin.y + (bounds.size.h - img.size.h) / 2,
+                       img.size.w, img.size.h);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
     graphics_draw_bitmap_in_rect(ctx, s_map_bitmap, dest);
-
-    // The location sits at the centre of the map image; track it after the
-    // vertical shift so the dot still marks the real position.
-    loc_point = GPoint(origin_x + img.size.w / 2, origin_y + img.size.h / 2);
+    // The image centre is the location; centred drawing puts it at screen
+    // centre, so the dot stays at the centre of the screen.
   }
 
   // Dot marking the user's location (the map is centred there).

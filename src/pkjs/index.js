@@ -123,7 +123,12 @@ function defaultSettings() {
     MAP_COLOR_BG: DEFAULT_MAP_COLORS[0],
     MAP_COLOR_1: DEFAULT_MAP_COLORS[1],
     MAP_COLOR_2: DEFAULT_MAP_COLORS[2],
-    MAP_COLOR_3: DEFAULT_MAP_COLORS[3]
+    MAP_COLOR_3: DEFAULT_MAP_COLORS[3],
+    // B&W tones: 0=black 1=white 2=dither 3=diagonal lines
+    MAP_TONE_BG: '0',
+    MAP_TONE_1: '3',
+    MAP_TONE_2: '2',
+    MAP_TONE_3: '1'
   };
 }
 
@@ -160,6 +165,14 @@ function getPlatformSize(platform) {
   return { w: s.w, h: s.h + 2 * ATTR_CROP };
 }
 
+// Black & white platforms have no colour: render the four levels as black,
+// white, or one of two 50%-grey patterns (fine checker dither / diagonal
+// lines) instead.
+function isBwPlatform(platform) {
+  return platform === 'aplite' || platform === 'diorite' ||
+         platform === 'flint';
+}
+
 // Build the 4-entry [r,g,b] palette from the user's map colour settings.
 function getMapPalette(settings) {
   var keys = ['MAP_COLOR_BG', 'MAP_COLOR_1', 'MAP_COLOR_2', 'MAP_COLOR_3'];
@@ -168,6 +181,25 @@ function getMapPalette(settings) {
     if (typeof v !== 'number') { v = DEFAULT_MAP_COLORS[i]; }
     return { r: (v >> 16) & 0xFF, g: (v >> 8) & 0xFF, b: v & 0xFF };
   });
+}
+
+// Build the 4-entry tone codes (0=black 1=white 2=dither 3=lines) for B&W.
+function getMapTones(settings) {
+  var keys = ['MAP_TONE_BG', 'MAP_TONE_1', 'MAP_TONE_2', 'MAP_TONE_3'];
+  return keys.map(function (k) {
+    var v = parseInt(settings[k], 10);
+    return (v >= 0 && v <= 3) ? v : 0;
+  });
+}
+
+// The black/white value (0 or 255) for a tone code at pixel (x, y).
+function toneValue(code, x, y) {
+  switch (code) {
+    case 1: return 255;                                  // white
+    case 2: return ((x + y) & 1) ? 255 : 0;              // 50% checker dither
+    case 3: return (((x + y) & 3) < 2) ? 255 : 0;        // diagonal lines
+    default: return 0;                                   // black
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -409,15 +441,17 @@ function rememberFetch(settings, loc, size) {
 }
 
 // ---------------------------------------------------------------------------
-// PNG conversion: reduce the Geoapify map to 4 brightness levels, paint each
-// with the user's palette colour, and re-encode as a small indexed PNG the
-// watch can decode. Encoded losslessly (cnum 0) so the exact palette survives.
+// PNG conversion: reduce the Geoapify map to 4 brightness levels and render
+// each level either with the user's palette colour (colour platforms) or as a
+// black/white tone pattern (B&W platforms). Re-encoded losslessly (cnum 0) so
+// the exact palette survives; a B&W image is just black + white -> 1-bit PNG.
+// `render` = { bw: bool, palette: [{r,g,b}x4], tones: [code x4] }.
 // ---------------------------------------------------------------------------
 
-function recolorToPalette(arrayBuffer, palette) {
+function buildMapImage(arrayBuffer, render) {
   var decoded = UPNG.decode(arrayBuffer);          // parse the Geoapify PNG
   var w = decoded.width, h = decoded.height;
-  console.log('Geoapify returned ' + w + 'x' + h);
+  console.log('Geoapify returned ' + w + 'x' + h + (render.bw ? ' (b&w)' : ''));
   var px = new Uint8Array(UPNG.toRGBA8(decoded)[0]); // first frame, RGBA bytes
 
   for (var i = 0; i < px.length; i += 4) {
@@ -428,8 +462,16 @@ function recolorToPalette(arrayBuffer, palette) {
     if (lum >= LEVEL_THRESHOLDS[2]) { level = 3; }
     else if (lum >= LEVEL_THRESHOLDS[1]) { level = 2; }
     else if (lum >= LEVEL_THRESHOLDS[0]) { level = 1; }
-    var c = palette[level];
-    px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b; px[i + 3] = 255;
+
+    if (render.bw) {
+      var p = i >> 2;
+      var v = toneValue(render.tones[level], p % w, (p / w) | 0);
+      px[i] = v; px[i + 1] = v; px[i + 2] = v;
+    } else {
+      var c = render.palette[level];
+      px[i] = c.r; px[i + 1] = c.g; px[i + 2] = c.b;
+    }
+    px[i + 3] = 255;
   }
 
   return new Uint8Array(UPNG.encode([px.buffer], w, h, 0));
@@ -439,7 +481,7 @@ function recolorToPalette(arrayBuffer, palette) {
 // Image download + streaming
 // ---------------------------------------------------------------------------
 
-function downloadAndSend(settings, loc, size, styleCustomization, palette) {
+function downloadAndSend(settings, loc, size, styleCustomization, render) {
   // POST request: the per-layer recolour customization is large, so it goes in
   // a JSON body (no URL-length limit, which truncated the GET version and made
   // roads hollow / dropped labels).
@@ -486,7 +528,7 @@ function downloadAndSend(settings, loc, size, styleCustomization, palette) {
     // producing a small indexed PNG the watch can decode.
     var bytes;
     try {
-      bytes = recolorToPalette(xhr.response, palette);
+      bytes = buildMapImage(xhr.response, render);
     } catch (convErr) {
       console.log('PNG conversion failed: ' + convErr);
       sendStatus('Convert fail');
@@ -562,8 +604,13 @@ function performUpdate(force) {
 
   var platform = getPlatform();
   var size = getPlatformSize(platform);
-  var palette = getMapPalette(settings);
-  console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h);
+  var render = {
+    bw: isBwPlatform(platform),
+    palette: getMapPalette(settings),
+    tones: getMapTones(settings)
+  };
+  console.log('Platform ' + platform + ', map ' + size.w + 'x' + size.h +
+              (render.bw ? ' (b&w)' : ''));
   sendStatus('Locating...');
   resolveLocation(settings, function (err, loc) {
     if (err) { sendStatus('No location'); finishSending(); return; }
@@ -573,7 +620,7 @@ function performUpdate(force) {
       return;
     }
     resolveStyleCustomization(settings, function (styleCustomization) {
-      downloadAndSend(settings, loc, size, styleCustomization, palette);
+      downloadAndSend(settings, loc, size, styleCustomization, render);
     });
   });
 }

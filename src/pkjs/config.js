@@ -186,6 +186,54 @@ module.exports = [
         "label": "Labels",
         "defaultValue": "FFFFFF",
         "sunlight": true
+      },
+      {
+        "type": "select",
+        "messageKey": "MAP_TONE_BG",
+        "label": "Land / background",
+        "defaultValue": "0",
+        "options": [
+          { "label": "Black", "value": "0" },
+          { "label": "White", "value": "1" },
+          { "label": "Grey (dither)", "value": "2" },
+          { "label": "Diagonal lines", "value": "3" }
+        ]
+      },
+      {
+        "type": "select",
+        "messageKey": "MAP_TONE_1",
+        "label": "Water",
+        "defaultValue": "3",
+        "options": [
+          { "label": "Black", "value": "0" },
+          { "label": "White", "value": "1" },
+          { "label": "Grey (dither)", "value": "2" },
+          { "label": "Diagonal lines", "value": "3" }
+        ]
+      },
+      {
+        "type": "select",
+        "messageKey": "MAP_TONE_2",
+        "label": "Roads",
+        "defaultValue": "2",
+        "options": [
+          { "label": "Black", "value": "0" },
+          { "label": "White", "value": "1" },
+          { "label": "Grey (dither)", "value": "2" },
+          { "label": "Diagonal lines", "value": "3" }
+        ]
+      },
+      {
+        "type": "select",
+        "messageKey": "MAP_TONE_3",
+        "label": "Labels",
+        "defaultValue": "1",
+        "options": [
+          { "label": "Black", "value": "0" },
+          { "label": "White", "value": "1" },
+          { "label": "Grey (dither)", "value": "2" },
+          { "label": "Diagonal lines", "value": "3" }
+        ]
       }
     ]
   },

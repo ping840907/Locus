@@ -134,7 +134,7 @@ requests/day on the free tier). The map appears once a location is resolved.
 | **Refresh distance (m)** | Re-download the map only after moving this far (50–5000 m). |
 | **Zoom level** | Map zoom (10–18). |
 | **Show place / road names** | Toggle map labels (local-language). |
-| **Map colours** | Recolour the map's 4 layers: Land / Water / Roads / Labels. |
+| **Map colours** | Recolour the map's 4 layers: Land / Water / Roads / Labels. On black & white watches these become tone choices (black / white / dither / diagonal lines). |
 | **Time / Date / Background colour** | Watchface overlay colours. |
 | **Show date** | Toggle the date line. |
 | **Show location dot** | Toggle the centre marker. |
@@ -170,6 +170,14 @@ requests/day on the free tier). The map appears once a location is resolved.
 * **On launch** the face is briefly blank (background colour) until the phone
   fetches and streams the first map (~1–2 s); the map is not cached on the
   watch.
+* **Centering.** The image is requested with extra margin on every side and the
+  location at its exact centre; the watch draws it centred so the location lands
+  at the screen centre on every platform (144×168, 180×180 chalk, 260×260
+  gabbro). The margin is cropped by the screen edges, hiding the attribution.
+* **Black & white platforms** (aplite, diorite, flint) can't show colour, so the
+  four map layers are rendered as black, white, or a 50%-grey pattern (fine
+  checker dither or diagonal lines), baked into a 1-bit image. The config page
+  shows tone dropdowns instead of colour pickers on these watches.
 * Screen sizes per platform are set in `PLATFORM_SIZES` in `index.js`
   (`gabbro` is 260×260 round; `flint` defaults to 144×168 — adjust if its
   actual resolution differs).
