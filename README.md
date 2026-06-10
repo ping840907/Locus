@@ -1,4 +1,4 @@
-# Map Face
+# Locus
 
 A Pebble watchface that uses the **Geoapify** Static Maps API to show a live,
 monochrome map of your surroundings (black background, grey road network) as
