@@ -190,3 +190,12 @@ requests/day on the free tier). The map appears once a location is resolved.
   actual resolution differs).
 * Geoapify free-tier usage: source caching + distance-gated downloads keep
   requests well within 3,000/day.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
+
+Map data © [Geoapify](https://www.geoapify.com/), © OpenMapTiles,
+© OpenStreetMap contributors.
