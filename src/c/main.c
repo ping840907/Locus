@@ -19,17 +19,15 @@
 // Persistent storage keys
 #define PERSIST_TIME_COLOR      100
 #define PERSIST_DATE_COLOR      101
-#define PERSIST_BG_COLOR        102
 #define PERSIST_SHOW_DATE       103
 #define PERSIST_SHOW_CENTER_DOT 104
 #define PERSIST_UPDATE_INTERVAL 105
 #define PERSIST_LOCATION_MODE   106  // 0 = follow current, 1 = fixed location
 #define PERSIST_SHOW_STATUS     107
 
-// Defaults (dark theme to match the dark-matter map style)
+// Defaults
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
 #define DEFAULT_DATE_COLOR      0xAAAAAA // light grey
-#define DEFAULT_BG_COLOR        0x000000 // black
 #define DEFAULT_SHOW_DATE       true
 #define DEFAULT_SHOW_CENTER_DOT true
 #define DEFAULT_UPDATE_INTERVAL 60       // minutes between location checks
@@ -117,12 +115,9 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_fill_color(ctx, s_bg_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
-  // Map background. The phone requests the image taller than the screen (extra
-  // margin on every side) with the location at its exact centre. We draw it
-  // centred on both axes, so the location always lands at the screen centre on
-  // every platform (144x168, 180x180 chalk, 260x260 gabbro, ...). The extra
-  // margin is cropped away by the screen edges, which also removes the
-  // Geoapify attribution band baked onto the bottom edge.
+  // The image is requested larger than the screen with the location at its
+  // centre; drawing it centred keeps the location at the screen centre on every
+  // platform and crops the extra margin (incl. the Geoapify attribution band).
   GPoint loc_point = grect_center_point(&bounds);
   if (s_map_bitmap) {
     GRect img = gbitmap_get_bounds(s_map_bitmap);
@@ -131,8 +126,6 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
                        img.size.w, img.size.h);
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
     graphics_draw_bitmap_in_rect(ctx, s_map_bitmap, dest);
-    // The image centre is the location; centred drawing puts it at screen
-    // centre, so the dot stays at the centre of the screen.
   }
 
   // Dot marking the user's location (the map is centred there).
@@ -248,18 +241,14 @@ static void finalize_image(void) {
   uint32_t recv = s_img_received, total = s_img_size;
   static char dbg[40];
 
-  // The transfer is good only if every byte arrived and the PNG signature is
-  // intact. A corrupted byte (e.g. from overlapping AppMessage traffic) shows
-  // up here as a bad signature.
+  // Valid only if every byte arrived and the PNG signature is intact.
   bool ok = (recv >= total) && total >= 8 &&
             b0 == 0x89 && b1 == 0x50 && b2 == 0x4E && b3 == 0x47;
 
   GBitmap *new_bitmap = NULL;
   if (ok) {
-    // Free the previous map BEFORE decoding the new one. Holding two
-    // full-screen bitmaps plus the PNG/decode buffers at once overflows RAM
-    // when reloading after a settings change (decode then fails -> the
-    // "Load failed" with an otherwise-valid PNG signature).
+    // Free the previous map before decoding so we never hold two full-screen
+    // bitmaps (plus decode buffers) at once.
     if (s_map_bitmap) {
       gbitmap_destroy(s_map_bitmap);
       s_map_bitmap = NULL;
@@ -314,12 +303,6 @@ static void apply_config(DictionaryIterator *iter) {
     persist_write_int(PERSIST_DATE_COLOR, t->value->int32);
     changed = true;
   }
-  t = dict_find(iter, MESSAGE_KEY_BG_COLOR);
-  if (t) {
-    s_bg_color = GColorFromHEX(t->value->int32);
-    persist_write_int(PERSIST_BG_COLOR, t->value->int32);
-    changed = true;
-  }
   t = dict_find(iter, MESSAGE_KEY_SHOW_DATE);
   if (t) {
     s_show_date = t->value->int32 != 0;
@@ -366,8 +349,7 @@ static void load_persisted_config(void) {
       ? persist_read_int(PERSIST_TIME_COLOR) : DEFAULT_TIME_COLOR);
   s_date_color = GColorFromHEX(persist_exists(PERSIST_DATE_COLOR)
       ? persist_read_int(PERSIST_DATE_COLOR) : DEFAULT_DATE_COLOR);
-  s_bg_color = GColorFromHEX(persist_exists(PERSIST_BG_COLOR)
-      ? persist_read_int(PERSIST_BG_COLOR) : DEFAULT_BG_COLOR);
+  s_bg_color = GColorBlack; // map fills the screen; this only shows before load
   s_show_date = persist_exists(PERSIST_SHOW_DATE)
       ? persist_read_bool(PERSIST_SHOW_DATE) : DEFAULT_SHOW_DATE;
   s_show_center_dot = persist_exists(PERSIST_SHOW_CENTER_DOT)

@@ -49,7 +49,6 @@
       "MAP_TONE_3",
       "TIME_COLOR",
       "DATE_COLOR",
-      "BG_COLOR",
       "SHOW_DATE",
       "SHOW_CENTER_DOT",
       "SHOW_STATUS",
@@ -58,8 +57,7 @@
       "IMG_SIZE",
       "IMG_OFFSET",
       "IMG_DATA",
-      "IMG_COMPLETE",
-      "IMG_ERROR"
+      "IMG_COMPLETE"
     ],
     "resources": {
       "media": [

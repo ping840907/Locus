@@ -293,6 +293,21 @@ module.exports = [
     ]
   },
 
+  // -------------------------------------------------------------------------
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Attribution"
+      },
+      {
+        "type": "text",
+        "defaultValue": "Powered by <a href=\"https://www.geoapify.com/\">Geoapify</a> — map data © OpenMapTiles © OpenStreetMap contributors."
+      }
+    ]
+  },
+
   {
     "type": "submit",
     "defaultValue": "Save settings"

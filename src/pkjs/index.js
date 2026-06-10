@@ -20,14 +20,9 @@ var clay = new Clay(clayConfig, customClay, { autoHandleEvents: false });
 // gbitmap_create_from_png_data() can decode.
 var UPNG = require('upng-js');
 
-// The Geoapify map is reduced to 4 brightness levels and recoloured with the
-// user's palette, producing a 2-bit (4-colour) indexed PNG: tiny to transfer
-// and very cheap for the watch to decode.
-
-// Geoapify burns a (two-line) attribution band onto the bottom of the static
-// map. We request the image this many extra pixels taller on each side; the
-// watch shifts the image up by the same amount so the band is pushed off the
-// bottom edge while the location stays centred. Must exceed the band height.
+// Extra margin (px per side) requested around the screen so the watch can
+// centre-crop the image, removing the Geoapify attribution band on the bottom
+// edge while keeping the location centred. Must exceed the band height.
 var ATTR_CROP = 60;
 
 // Geoapify is asked to render the map in 4 well-separated greys
@@ -46,7 +41,6 @@ var DEFAULT_MAP_COLORS = [0x000000, 0x555555, 0xAAAAAA, 0xFFFFFF];
 var CLAY_SETTINGS_KEY = 'clay-settings';
 var SRC_META_KEY = 'mapface-srcmeta';   // {lat, lon, sig} of the cached source
 var SRC_BYTES_KEY = 'mapface-src';      // cached Geoapify source PNG (bin string)
-var PREV_KEY = 'mapface-prev';          // snapshot of last-applied settings (diff)
 var CHUNK_SIZE = 1000; // bytes of image data per AppMessage
 
 // Which settings, when changed, require what:
@@ -95,8 +89,19 @@ function pumpQueue() {
   });
 }
 
-// Mark the current transfer finished and run any update that was requested
-// while it was in progress.
+// Start an update now, or queue it if a transfer is in progress (so a request
+// arriving mid-transfer isn't lost).
+function requestUpdate(force, stream) {
+  if (sending) {
+    pendingUpdate = true;
+    pendingForce = pendingForce || force;
+    pendingStream = pendingStream || stream;
+  } else {
+    performUpdate(force, stream);
+  }
+}
+
+// Mark the current transfer finished and run any queued update.
 function finishSending() {
   sending = false;
   if (pendingUpdate) {
@@ -726,9 +731,9 @@ function sendConfigToWatch(dict, onDone) {
 
 Pebble.addEventListener('ready', function () {
   console.log('Map Face JS ready');
-  // On launch the watch has no map, so stream one — but reuse the cached source
-  // (no API call) unless it's missing/stale.
-  performUpdate(false, true);
+  // On launch the watch has no map: stream one, reusing the cached source (no
+  // API call) unless it's missing/stale.
+  requestUpdate(false, true);
 });
 
 Pebble.addEventListener('showConfiguration', function () {
@@ -771,32 +776,18 @@ Pebble.addEventListener('webviewclosed', function (e) {
       return;
     }
     if (sourceChanged) {
-      // The map image itself differs -> refetch from Geoapify.
-      performUpdate(true, true);
+      requestUpdate(true, true);   // map image differs -> refetch
     } else if (recolorChanged) {
-      // Only colours/tones changed -> recolour the cached source, no API call.
-      performUpdate(false, true);
+      requestUpdate(false, true);  // colours only -> recolour cached, no API
     }
-    // Otherwise only watch-side / gating settings changed: config already sent,
-    // nothing to fetch or re-stream.
+    // Otherwise only watch-side / gating settings changed: nothing to fetch.
   });
 });
 
 Pebble.addEventListener('appmessage', function (e) {
   if (e.payload && e.payload.REQUEST_UPDATE !== undefined) {
-    // mode 1 = periodic check: fetch only if moved beyond the refresh distance.
-    // mode 2 = the watch hit a corrupt transfer: re-stream from the cached
-    //          source (re-encodes + re-sends, no API call) and only fetch if
-    //          there is no cache.
-    var stream = e.payload.REQUEST_UPDATE === 2;
-    if (sending) {
-      // A transfer is finishing; remember the request so it isn't lost to the
-      // brief window before `sending` clears (which left the watch stuck on
-      // "Retrying").
-      pendingUpdate = true;
-      pendingStream = pendingStream || stream;
-    } else {
-      performUpdate(false, stream);
-    }
+    // mode 1 = periodic check (fetch only if moved beyond the refresh distance)
+    // mode 2 = watch hit a corrupt transfer (re-stream from the cached source)
+    requestUpdate(false, e.payload.REQUEST_UPDATE === 2);
   }
 });

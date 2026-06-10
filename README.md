@@ -167,10 +167,9 @@ requests/day on the free tier). The map appears once a location is resolved.
   four greys and paints the user's palette. Hiding labels sets the symbol
   layers to `none`.
 * **Attribution.** Geoapify burns an attribution band onto the bottom of the
-  static image. The app requests the map taller and centre-crops it on the
-  watch so the band is off-screen while the location stays centred. Note that
-  the Geoapify free tier expects attribution to remain visible — keep this in
-  mind for any public distribution.
+  static image; the watch centre-crops it off the screen. The required
+  "Powered by Geoapify" credit (with link) is instead shown on the Clay
+  configuration page.
 * **Road visibility.** A gamma curve lifts dark tones before the map is bucketed
   into brightness levels, so dim roads land in a visible level instead of the
   background. Adjust the level thresholds (`LEVEL_THRESHOLDS`) in `index.js` to
