@@ -1,6 +1,6 @@
 {
-  "name": "mapwatchface",
-  "author": "tom840907",
+  "name": "locus",
+  "author": "sloth8497",
   "version": "1.0.0",
   "license": "MIT",
   "keywords": [
@@ -13,7 +13,7 @@
     "upng-js": "^2.1.0"
   },
   "pebble": {
-    "displayName": "Map Face",
+    "displayName": "Locus",
     "uuid": "307fcb13-d8ff-49a9-af00-48578bf970e8",
     "sdkVersion": "3",
     "enableMultiJS": true,
