@@ -57,6 +57,7 @@ var sending = false;        // a map transfer is in progress
 var pendingUpdate = false;  // an update was requested while sending
 var pendingForce = false;
 var pendingStream = false;
+var sendingWatchdog = null;  // clears `sending` if an update ever gets stuck
 
 // ---------------------------------------------------------------------------
 // Serialised AppMessage sender.
@@ -103,6 +104,7 @@ function requestUpdate(force, stream) {
 
 // Mark the current transfer finished and run any queued update.
 function finishSending() {
+  if (sendingWatchdog) { clearTimeout(sendingWatchdog); sendingWatchdog = null; }
   sending = false;
   if (pendingUpdate) {
     pendingUpdate = false;
@@ -281,6 +283,8 @@ function ipFallback(settings, cb) {
     }
   };
   xhr.onerror = function () { cb('IP geolocation network error', null); };
+  xhr.ontimeout = function () { cb('IP geolocation timeout', null); };
+  xhr.timeout = 15000;
   xhr.send();
 }
 
@@ -667,8 +671,14 @@ function performUpdate(force, streamCache) {
   }
 
   // Claim the transfer slot up-front (not inside the async callback) so a
-  // second trigger can't start an overlapping transfer.
+  // second trigger can't start an overlapping transfer. A watchdog clears it
+  // if anything (e.g. geolocation or a request) never calls back, so periodic
+  // updates can't be blocked forever by one stuck attempt.
   sending = true;
+  if (sendingWatchdog) { clearTimeout(sendingWatchdog); }
+  sendingWatchdog = setTimeout(function () {
+    if (sending) { console.log('Update watchdog: clearing stuck transfer'); finishSending(); }
+  }, 45000);
 
   var platform = getPlatform();
   var size = getPlatformSize(platform);
