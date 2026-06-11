@@ -75,11 +75,10 @@ static void clear_status_cb(void *ctx) {
   }
 }
 
-// Benign progress/OK messages auto-hide; errors stay on screen.
+// Only the benign terminal "up to date" message auto-hides; errors and
+// in-progress messages stay on screen.
 static bool is_transient_status(const char *t) {
-  return strcmp(t, "Map up to date") == 0 ||
-         strcmp(t, "Locating...") == 0 ||
-         strcmp(t, "Loading map...") == 0;
+  return strcmp(t, "Map up to date") == 0;
 }
 
 static void set_status(const char *text) {
