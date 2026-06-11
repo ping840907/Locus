@@ -24,6 +24,8 @@
 #define PERSIST_UPDATE_INTERVAL 105
 #define PERSIST_LOCATION_MODE   106  // 0 = follow current, 1 = fixed location
 #define PERSIST_SHOW_STATUS     107
+#define PERSIST_TIME_FONT       108  // -1 = auto (platform default)
+#define PERSIST_DATE_FONT       109  // -1 = auto (platform default)
 
 // Defaults
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
@@ -32,6 +34,8 @@
 #define DEFAULT_SHOW_CENTER_DOT false
 #define DEFAULT_UPDATE_INTERVAL 60       // minutes between location checks
 #define DEFAULT_SHOW_STATUS     true
+#define DEFAULT_TIME_FONT       (-1)     // -1 = auto: pick by screen size
+#define DEFAULT_DATE_FONT       (-1)     // -1 = auto: pick by screen size
 
 static Window *s_window;
 static Layer *s_canvas_layer;     // draws bg + map + center dot
@@ -58,6 +62,8 @@ static int s_update_interval = DEFAULT_UPDATE_INTERVAL; // minutes
 static int s_minutes_since_update = 0;
 static bool s_fixed_location = false; // no periodic refresh when fixed
 static bool s_show_status = DEFAULT_SHOW_STATUS;
+static int  s_time_font = DEFAULT_TIME_FONT;
+static int  s_date_font = DEFAULT_DATE_FONT;
 
 // Cached time strings
 static char s_time_buf[8];
@@ -183,26 +189,105 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GColor shadow = GColorBlack;
 
-  // Larger displays (emery 200x228, gabbro 260x260) get bigger fonts. The
-  // LECO_60 font only exists in the SDK for those platforms, so guard its use
-  // with #ifdef to keep the other platforms compiling.
   GFont time_font;
   GFont date_font;
   int time_h;
   int date_h;
+  bool large = bounds.size.w >= 200;
+
+  // Time font — cases 5/6 (LECO 60) are only available on emery/gabbro
+  // (guarded by #ifdef); on smaller platforms they fall back to LECO 42.
+  switch (s_time_font) {
+    case 0:
+      time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 44;
+      break;
+    case 1:
+      time_font = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
+      time_h = 44;
+      break;
+    case 2:
+      time_font = fonts_get_system_font(FONT_KEY_BITHAM_42_MEDIUM_NUMBERS);
+      time_h = 44;
+      break;
+    case 3:
+      time_font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
+      time_h = 44;
+      break;
+    case 4:
+      time_font = fonts_get_system_font(FONT_KEY_ROBOTO_BOLD_SUBSET_49);
+      time_h = 52;
+      break;
+    case 7:
+      time_font = fonts_get_system_font(FONT_KEY_BITHAM_34_MEDIUM_NUMBERS);
+      time_h = 38;
+      break;
+    case 8:
+      time_font = fonts_get_system_font(FONT_KEY_LECO_36_BOLD_NUMBERS);
+      time_h = 40;
+      break;
+    case 9:
+      time_font = fonts_get_system_font(FONT_KEY_LECO_38_BOLD_NUMBERS);
+      time_h = 42;
+      break;
+    case 5:
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
-  if (bounds.size.w >= 200) {
-    time_font = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
-    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
-    time_h = 64;
-    date_h = 32;
-  } else
+      if (large) {
+        time_font = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+        time_h = 64;
+        break;
+      }
 #endif
-  {
-    time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-    date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
-    time_h = 44;
-    date_h = 22;
+      time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 44;
+      break;
+    case 6:
+#ifdef FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM
+      if (large) {
+        time_font = fonts_get_system_font(FONT_KEY_LECO_60_BOLD_NUMBERS_AM_PM);
+        time_h = 64;
+        break;
+      }
+#endif
+      time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 44;
+      break;
+    default: // -1 = auto: pick by screen size
+#ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
+      if (large) {
+        time_font = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+        time_h = 64;
+      } else
+#endif
+      {
+        time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+        time_h = 44;
+      }
+      break;
+  }
+
+  // Date font — all fonts below are available on every platform
+  switch (s_date_font) {
+    case 0:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);           date_h = 18; break;
+    case 1:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);      date_h = 18; break;
+    case 2:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18);           date_h = 22; break;
+    case 3:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);      date_h = 22; break;
+    case 4:  date_font = fonts_get_system_font(FONT_KEY_ROBOTO_CONDENSED_21); date_h = 26; break;
+    case 5:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_24);           date_h = 28; break;
+    case 6:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);      date_h = 28; break;
+    case 7:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);           date_h = 32; break;
+    case 8:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);      date_h = 32; break;
+    case 9:  date_font = fonts_get_system_font(FONT_KEY_DROID_SERIF_28_BOLD); date_h = 32; break;
+    case 10: date_font = fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK);     date_h = 34; break;
+    default: // -1 = auto: pick by screen size
+      if (large) {
+        date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+        date_h = 32;
+      } else {
+        date_font = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+        date_h = 22;
+      }
+      break;
   }
   int block_h = s_show_date ? (time_h + 6 + date_h) : time_h;
   int top = bounds.origin.y + (bounds.size.h - block_h) / 2;
@@ -215,7 +300,6 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
   if (s_show_date) {
     // A short accent divider between time and date for a designed look. Wider
     // and thicker on the large-font platforms (emery / gabbro) to match.
-    bool large = bounds.size.w >= 200;
     int divider_w = large ? 64 : 40;
     int thick = large ? 2 : 1;
     int divider_y = top + time_h + 2;
@@ -370,6 +454,20 @@ static void apply_config(DictionaryIterator *iter) {
     persist_write_bool(PERSIST_SHOW_STATUS, s_show_status);
     changed = true;
   }
+  t = dict_find(iter, MESSAGE_KEY_TIME_FONT);
+  if (t) {
+    int v = (t->type == TUPLE_CSTRING) ? atoi(t->value->cstring) : t->value->int32;
+    s_time_font = v;
+    persist_write_int(PERSIST_TIME_FONT, v);
+    changed = true;
+  }
+  t = dict_find(iter, MESSAGE_KEY_DATE_FONT);
+  if (t) {
+    int v = (t->type == TUPLE_CSTRING) ? atoi(t->value->cstring) : t->value->int32;
+    s_date_font = v;
+    persist_write_int(PERSIST_DATE_FONT, v);
+    changed = true;
+  }
 
   if (changed) {
     layer_mark_dirty(s_canvas_layer);
@@ -394,6 +492,10 @@ static void load_persisted_config(void) {
       ? persist_read_bool(PERSIST_LOCATION_MODE) : false;
   s_show_status = persist_exists(PERSIST_SHOW_STATUS)
       ? persist_read_bool(PERSIST_SHOW_STATUS) : DEFAULT_SHOW_STATUS;
+  s_time_font = persist_exists(PERSIST_TIME_FONT)
+      ? persist_read_int(PERSIST_TIME_FONT) : DEFAULT_TIME_FONT;
+  s_date_font = persist_exists(PERSIST_DATE_FONT)
+      ? persist_read_int(PERSIST_DATE_FONT) : DEFAULT_DATE_FONT;
 }
 
 // ---------------------------------------------------------------------------
