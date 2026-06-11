@@ -66,6 +66,36 @@
           "name": "IMAGE_MENU_ICON",
           "file": "images/icon-25.png",
           "menuIcon": true
+        },
+        {
+          "type": "png",
+          "name": "MAP_PLACEHOLDER",
+          "file": "images/map-placeholder-144x168-bw.png",
+          "targetPlatforms": ["aplite", "diorite", "flint"]
+        },
+        {
+          "type": "png",
+          "name": "MAP_PLACEHOLDER",
+          "file": "images/map-placeholder-144x168.png",
+          "targetPlatforms": ["basalt"]
+        },
+        {
+          "type": "png",
+          "name": "MAP_PLACEHOLDER",
+          "file": "images/map-placeholder-180x180.png",
+          "targetPlatforms": ["chalk"]
+        },
+        {
+          "type": "png",
+          "name": "MAP_PLACEHOLDER",
+          "file": "images/map-placeholder-200x228.png",
+          "targetPlatforms": ["emery"]
+        },
+        {
+          "type": "png",
+          "name": "MAP_PLACEHOLDER",
+          "file": "images/map-placeholder-260x260.png",
+          "targetPlatforms": ["gabbro"]
         }
       ]
     },

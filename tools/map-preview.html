@@ -84,12 +84,44 @@
 // ---- must match the watchface (index.js) ---------------------------------
 var ATTR_CROP = 60;            // extra px per side, centre-cropped by the watch
 var PLATFORMS = [
-  { label: '144x168 — aplite / basalt / diorite / flint', w: 144, h: 168 },
-  { label: '180x180 — chalk (round)',                     w: 180, h: 180 },
-  { label: '200x228 — emery',                             w: 200, h: 228 },
-  { label: '260x260 — gabbro (round)',                    w: 260, h: 260 }
+  { label: '144x168 — aplite / diorite / flint (B&W)', w: 144, h: 168, bw: true  },
+  { label: '144x168 — basalt (colour)',                w: 144, h: 168, bw: false },
+  { label: '180x180 — chalk (round)',                  w: 180, h: 180, bw: false },
+  { label: '200x228 — emery',                          w: 200, h: 228, bw: false },
+  { label: '260x260 — gabbro (round)',                 w: 260, h: 260, bw: false }
 ];
 var GREY = { land: '#000000', water: '#555555', road: '#aaaaaa', label: '#ffffff' };
+
+// Luminance thresholds that snap each pixel to one of 4 levels (must match index.js).
+var LEVEL_THRESHOLDS = [43, 128, 213];
+// Default B&W tone codes: 0=black 1=white 2=checker dither 3=diagonal lines
+// Order: [land, water, roads, labels]  (same defaults as index.js)
+var DEFAULT_TONES = [0, 3, 2, 1];
+
+// Return 0 or 255 for tone `code` at pixel coordinate (x, y).
+function toneValue(code, x, y) {
+  switch (code) {
+    case 1: return 255;
+    case 2: return ((x + y) & 1) ? 255 : 0;
+    case 3: return (((x + y) & 3) < 2) ? 255 : 0;
+    default: return 0;
+  }
+}
+
+// Apply B&W dithering in-place on an ImageData object (must match buildMapImage in index.js).
+function ditherImageData(imageData, tones) {
+  var d = imageData.data, w = imageData.width;
+  for (var i = 0; i < d.length; i += 4) {
+    var lum = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
+    var level = 0;
+    if      (lum >= LEVEL_THRESHOLDS[2]) { level = 3; }
+    else if (lum >= LEVEL_THRESHOLDS[1]) { level = 2; }
+    else if (lum >= LEVEL_THRESHOLDS[0]) { level = 1; }
+    var p = i >> 2;
+    var v = toneValue(tones[level], p % w, (p / w) | 0);
+    d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+  }
+}
 
 var CITIES = [
   [40.7128, -74.0060], [51.5074, -0.1278], [35.6762, 139.6503],
@@ -127,7 +159,7 @@ var sel = $('platform');
 PLATFORMS.forEach(function (p, i) {
   var o = document.createElement('option'); o.value = i; o.textContent = p.label; sel.appendChild(o);
 });
-sel.value = 2; // emery default
+sel.value = 3; // emery default
 
 // Persist the API key locally.
 $('key').value = localStorage.getItem('geoapify-key') || '';
@@ -193,7 +225,7 @@ $('go').addEventListener('click', function () {
 function showResult(img, fullUrl, p) {
   var scale = parseInt($('scale').value, 10) || 1;
 
-  // Full image
+  // Full image (always shown as-is; dithering only applied to the watch crop).
   var full = $('full');
   full.src = fullUrl;
   full.style.transform = 'scale(' + scale + ')';
@@ -211,6 +243,14 @@ function showResult(img, fullUrl, p) {
   var ctx = c.getContext('2d');
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(img, cx, cy, p.w, p.h, 0, 0, p.w, p.h);
+
+  // For B&W platforms apply the same dithering that buildMapImage() uses.
+  if (p.bw) {
+    var id = ctx.getImageData(0, 0, p.w, p.h);
+    ditherImageData(id, DEFAULT_TONES);
+    ctx.putImageData(id, 0, 0);
+  }
+
   c.toBlob(function (b) { $('dlCrop').href = URL.createObjectURL(b); });
 
   setStatus('Done — ' + img.width + 'x' + img.height + ' (watch view ' + p.w + 'x' + p.h + ').');

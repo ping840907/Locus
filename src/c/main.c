@@ -481,6 +481,9 @@ static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
 
+  // Show the bundled placeholder until the first live map arrives.
+  s_map_bitmap = gbitmap_create_with_resource(RESOURCE_ID_MAP_PLACEHOLDER);
+
   s_canvas_layer = layer_create(bounds);
   layer_set_update_proc(s_canvas_layer, canvas_update_proc);
   layer_add_child(root, s_canvas_layer);
