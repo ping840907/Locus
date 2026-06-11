@@ -29,7 +29,7 @@
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
 #define DEFAULT_DATE_COLOR      0xAAAAAA // light grey
 #define DEFAULT_SHOW_DATE       true
-#define DEFAULT_SHOW_CENTER_DOT true
+#define DEFAULT_SHOW_CENTER_DOT false
 #define DEFAULT_UPDATE_INTERVAL 60       // minutes between location checks
 #define DEFAULT_SHOW_STATUS     true
 
