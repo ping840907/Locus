@@ -213,15 +213,22 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
                         s_time_color, shadow, GTextAlignmentCenter);
 
   if (s_show_date) {
-    // A short accent divider between time and date for a designed look.
-    int divider_w = 40;
+    // A short accent divider between time and date for a designed look. Wider
+    // and thicker on the large-font platforms (emery / gabbro) to match.
+    bool large = bounds.size.w >= 200;
+    int divider_w = large ? 64 : 40;
+    int thick = large ? 2 : 1;
     int divider_y = top + time_h + 2;
-    GPoint dl = GPoint(bounds.origin.x + (bounds.size.w - divider_w) / 2, divider_y);
-    GPoint dr = GPoint(dl.x + divider_w, divider_y);
+    int dx = bounds.origin.x + (bounds.size.w - divider_w) / 2;
+
     graphics_context_set_stroke_color(ctx, shadow);
-    graphics_draw_line(ctx, GPoint(dl.x, dl.y + 1), GPoint(dr.x, dr.y + 1));
+    graphics_draw_line(ctx, GPoint(dx, divider_y + thick),
+                       GPoint(dx + divider_w, divider_y + thick));
     graphics_context_set_stroke_color(ctx, s_date_color);
-    graphics_draw_line(ctx, dl, dr);
+    for (int i = 0; i < thick; i++) {
+      graphics_draw_line(ctx, GPoint(dx, divider_y + i),
+                         GPoint(dx + divider_w, divider_y + i));
+    }
 
     // Date
     GRect date_box = GRect(bounds.origin.x, divider_y + 4, bounds.size.w, date_h);
