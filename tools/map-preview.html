@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locus — Map Preview / Generator</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px;
+         background: #111; color: #eee; line-height: 1.5; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.sub { color: #aaa; margin: 0 0 20px; max-width: 640px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+         margin-bottom: 14px; }
+  label { display: flex; flex-direction: column; font-size: 0.8rem; color: #bbb; gap: 4px; }
+  input, select { background: #222; color: #eee; border: 1px solid #444;
+                  border-radius: 6px; padding: 7px 9px; font-size: 0.9rem; }
+  input#key { width: 320px; }
+  button { background: #2e6cf6; color: #fff; border: 0; border-radius: 6px;
+           padding: 9px 14px; font-size: 0.9rem; cursor: pointer; }
+  button.alt { background: #333; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #status { color: #9ab; font-size: 0.85rem; margin-left: 8px; }
+  .results { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 22px; }
+  figure { margin: 0; }
+  figcaption { font-size: 0.8rem; color: #aaa; margin-bottom: 6px; }
+  img, canvas { image-rendering: pixelated; background: #000; border: 1px solid #333;
+                /* scale up small watch images so they're easy to see */
+                transform-origin: top left; }
+  .dl { margin-top: 8px; display: flex; gap: 12px; }
+  a { color: #6af; }
+  code { background: #222; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+  <h1>Locus — map preview &amp; generator</h1>
+  <p class="sub">Generates the same monochrome map Locus draws (Geoapify
+  <code>dark-matter</code> recoloured to land/water/roads/labels greys) at each
+  platform's resolution. Handy for screenshots and demo backgrounds when the
+  emulator can't fetch maps. Your API key is stored only in this browser.</p>
+
+  <div class="row">
+    <label>Geoapify API key
+      <input id="key" placeholder="your-geoapify-api-key" autocomplete="off">
+    </label>
+  </div>
+
+  <div class="row">
+    <label>Latitude  <input id="lat" value="25.0330" style="width:120px"></label>
+    <label>Longitude <input id="lon" value="121.5654" style="width:120px"></label>
+    <button class="alt" id="randCity">Random city</button>
+    <button class="alt" id="randCoords">Random coordinates</button>
+  </div>
+
+  <div class="row">
+    <label>Platform
+      <select id="platform"></select>
+    </label>
+    <label>Zoom <input id="zoom" type="number" value="15" min="10" max="18" style="width:70px"></label>
+    <label>Display scale
+      <select id="scale"><option>1</option><option selected>2</option><option>3</option><option>4</option></select>
+    </label>
+    <label style="flex-direction:row;align-items:center;gap:6px">
+      <input type="checkbox" id="labels" checked> Show labels
+    </label>
+    <button id="go">Generate</button>
+    <span id="status"></span>
+  </div>
+
+  <div class="results">
+    <figure>
+      <figcaption>Watch view (centre-cropped to the screen)</figcaption>
+      <canvas id="crop"></canvas>
+      <div class="dl"><a id="dlCrop" download="locus-map.png">Download watch view</a></div>
+    </figure>
+    <figure>
+      <figcaption>Full fetched image (with crop margin)</figcaption>
+      <img id="full">
+      <div class="dl"><a id="dlFull" download="locus-map-full.png">Download full</a></div>
+    </figure>
+  </div>
+
+<script>
+// ---- must match the watchface (index.js) ---------------------------------
+var ATTR_CROP = 60;            // extra px per side, centre-cropped by the watch
+var PLATFORMS = [
+  { label: '144x168 — aplite / basalt / diorite / flint', w: 144, h: 168 },
+  { label: '180x180 — chalk (round)',                     w: 180, h: 180 },
+  { label: '200x228 — emery',                             w: 200, h: 228 },
+  { label: '260x260 — gabbro (round)',                    w: 260, h: 260 }
+];
+var GREY = { land: '#000000', water: '#555555', road: '#aaaaaa', label: '#ffffff' };
+
+var CITIES = [
+  [40.7128, -74.0060], [51.5074, -0.1278], [35.6762, 139.6503],
+  [48.8566, 2.3522], [25.0330, 121.5654], [22.3193, 114.1694],
+  [1.3521, 103.8198], [-33.8688, 151.2093], [55.7558, 37.6173],
+  [37.7749, -122.4194], [52.5200, 13.4050], [19.4326, -99.1332],
+  [-23.5505, -46.6333], [41.0082, 28.9784], [31.2304, 121.4737],
+  [28.6139, 77.2090], [-26.2041, 28.0473], [45.4642, 9.1900],
+  [59.3293, 18.0686], [43.6532, -79.3832]
+];
+
+// Build the styleCustomization array (same rules as the watch).
+function buildStyleCustomization(layers, showLabels) {
+  var out = [];
+  (layers || []).forEach(function (layer) {
+    var id = layer.id; if (!id) { return; }
+    var type = layer.type;
+    var sl = (layer['source-layer'] || '') + ' ' + id;
+    var isWater = /water|ocean|river|waterway|lake|sea|bay|strait/i.test(sl);
+    var isBoundary = /boundary|admin|border/i.test(sl);
+    if (type === 'symbol') { out.push({ layer: id, color: showLabels ? GREY.label : 'none' }); }
+    else if (type === 'background') { out.push({ layer: id, color: GREY.land }); }
+    else if (isWater) { out.push({ layer: id, color: GREY.water }); }
+    else if (type === 'line') {
+      if (/casing/i.test(id)) { out.push({ layer: id, color: GREY.road }); }
+      else if (/inner/i.test(id)) { out.push({ layer: id, color: 'none' }); }
+      else { out.push({ layer: id, color: isBoundary ? GREY.land : GREY.road }); }
+    }
+  });
+  return out;
+}
+
+var $ = function (id) { return document.getElementById(id); };
+var sel = $('platform');
+PLATFORMS.forEach(function (p, i) {
+  var o = document.createElement('option'); o.value = i; o.textContent = p.label; sel.appendChild(o);
+});
+sel.value = 2; // emery default
+
+// Persist the API key locally.
+$('key').value = localStorage.getItem('geoapify-key') || '';
+$('key').addEventListener('change', function () {
+  localStorage.setItem('geoapify-key', this.value.trim());
+});
+
+$('randCity').addEventListener('click', function () {
+  var c = CITIES[Math.floor(Math.random() * CITIES.length)];
+  $('lat').value = c[0]; $('lon').value = c[1];
+});
+$('randCoords').addEventListener('click', function () {
+  // Avoid the poles where most styles render nothing useful.
+  $('lat').value = (Math.random() * 130 - 60).toFixed(4);   // -60 .. 70
+  $('lon').value = (Math.random() * 360 - 180).toFixed(4);  // -180 .. 180
+});
+
+function setStatus(t) { $('status').textContent = t; }
+
+$('go').addEventListener('click', function () {
+  var key = $('key').value.trim();
+  if (!key) { setStatus('Enter your Geoapify API key.'); return; }
+  localStorage.setItem('geoapify-key', key);
+
+  var p = PLATFORMS[+sel.value];
+  var lat = parseFloat($('lat').value), lon = parseFloat($('lon').value);
+  if (!isFinite(lat) || !isFinite(lon)) { setStatus('Invalid lat/lon.'); return; }
+  var zoom = parseInt($('zoom').value, 10) || 15;
+  var showLabels = $('labels').checked;
+  var reqW = p.w, reqH = p.h + 2 * ATTR_CROP;
+
+  $('go').disabled = true;
+  setStatus('Fetching style…');
+
+  var styleUrl = 'https://maps.geoapify.com/v1/styles/dark-matter/style.json?apiKey=' +
+                 encodeURIComponent(key);
+  fetch(styleUrl)
+    .then(function (r) { return r.ok ? r.json() : Promise.reject('style.json HTTP ' + r.status); })
+    .then(function (style) {
+      var custom = buildStyleCustomization(style.layers, showLabels);
+      setStatus('Rendering map…');
+      var body = {
+        style: 'dark-matter', width: reqW, height: reqH,
+        center: { lat: lat, lon: lon }, zoom: zoom,
+        format: 'png', scaleFactor: 1, styleCustomization: custom
+      };
+      return fetch('https://maps.geoapify.com/v1/staticmap?apiKey=' + encodeURIComponent(key), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+    })
+    .then(function (r) { return r.ok ? r.blob() : Promise.reject('staticmap HTTP ' + r.status); })
+    .then(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function () { showResult(img, url, p); };
+      img.src = url;
+    })
+    .catch(function (e) { setStatus('Error: ' + e + ' (check key / network / CORS)'); })
+    .then(function () { $('go').disabled = false; });
+});
+
+function showResult(img, fullUrl, p) {
+  var scale = parseInt($('scale').value, 10) || 1;
+
+  // Full image
+  var full = $('full');
+  full.src = fullUrl;
+  full.style.transform = 'scale(' + scale + ')';
+  full.style.marginBottom = ((img.height) * (scale - 1)) + 'px';
+  full.style.marginRight = ((img.width) * (scale - 1)) + 'px';
+  $('dlFull').href = fullUrl;
+
+  // Watch view: centre-crop to p.w x p.h (the watch centres the taller image).
+  var cx = Math.floor((img.width - p.w) / 2);
+  var cy = Math.floor((img.height - p.h) / 2);
+  var c = $('crop');
+  c.width = p.w; c.height = p.h;
+  c.style.width = (p.w * scale) + 'px';
+  c.style.height = (p.h * scale) + 'px';
+  var ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(img, cx, cy, p.w, p.h, 0, 0, p.w, p.h);
+  c.toBlob(function (b) { $('dlCrop').href = URL.createObjectURL(b); });
+
+  setStatus('Done — ' + img.width + 'x' + img.height + ' (watch view ' + p.w + 'x' + p.h + ').');
+}
+</script>
+</body>
+</html>
