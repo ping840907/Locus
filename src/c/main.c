@@ -65,10 +65,30 @@ static char s_date_buf[24];
 
 // Transient status / debug line shown at the bottom of the face.
 static char s_status[40] = "";
+static AppTimer *s_status_timer = NULL;
+
+static void clear_status_cb(void *ctx) {
+  s_status_timer = NULL;
+  s_status[0] = '\0';
+  if (s_overlay_layer) {
+    layer_mark_dirty(s_overlay_layer);
+  }
+}
 
 static void set_status(const char *text) {
   strncpy(s_status, text, sizeof(s_status) - 1);
   s_status[sizeof(s_status) - 1] = '\0';
+
+  // Auto-hide a non-empty status after a few seconds so messages like
+  // "Map up to date" don't linger; an empty status clears immediately.
+  if (s_status_timer) {
+    app_timer_cancel(s_status_timer);
+    s_status_timer = NULL;
+  }
+  if (s_status[0] != '\0') {
+    s_status_timer = app_timer_register(6000, clear_status_cb, NULL);
+  }
+
   if (s_overlay_layer) {
     layer_mark_dirty(s_overlay_layer);
   }
