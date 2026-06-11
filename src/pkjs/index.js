@@ -595,6 +595,21 @@ function fetchSourceAndSend(settings, loc, size, styleCustomization, render) {
     var len = 0;
     try { len = xhr.response ? new Uint8Array(xhr.response).byteLength : 0; }
     catch (e) { len = -1; }
+
+    // Some JS runtimes (notably CloudPebble / pypkjs) honour the HTTP status
+    // but return null for responseType='arraybuffer' due to a limitation in
+    // the Python↔V8 bridge. The body is still available as a binary string
+    // in responseText, so fall back to that and rebuild an ArrayBuffer.
+    var responseBuffer = xhr.response;
+    if (len <= 0 && xhr.responseText && xhr.responseText.length > 0) {
+      var text = xhr.responseText;
+      var u8 = new Uint8Array(text.length);
+      for (var i = 0; i < text.length; i++) { u8[i] = text.charCodeAt(i) & 0xFF; }
+      responseBuffer = u8.buffer;
+      len = u8.byteLength;
+      console.log('arraybuffer fallback via responseText: ' + len + ' bytes');
+    }
+
     console.log('Map response: HTTP ' + xhr.status + ', ' + len + ' bytes');
 
     if (xhr.status !== 200) {
@@ -603,7 +618,6 @@ function fetchSourceAndSend(settings, loc, size, styleCustomization, render) {
       return;
     }
     if (len <= 0) {
-      // 200 but no binary body: arraybuffer not honoured by this JS runtime.
       sendStatus('Empty body n=' + len);
       finishSending();
       return;
@@ -611,9 +625,9 @@ function fetchSourceAndSend(settings, loc, size, styleCustomization, render) {
 
     // Cache the raw source so future launches / colour changes can reuse it
     // without another API call, then recolour and stream it.
-    var src = new Uint8Array(xhr.response);
+    var src = new Uint8Array(responseBuffer);
     saveSource(src, settings, loc, size);
-    streamRecolored(xhr.response, render);
+    streamRecolored(responseBuffer, render);
   };
   xhr.onerror = function () {
     console.log('Map request network error (status ' + xhr.status + ')');
