@@ -23,7 +23,10 @@ var UPNG = require('upng-js');
 // Extra margin (px per side) requested around the screen so the watch can
 // centre-crop the image, removing the Geoapify attribution band on the bottom
 // edge while keeping the location centred. Must exceed the band height.
-var ATTR_CROP = 60;
+// Small (144×168) platforms need a larger margin because at that resolution
+// Geoapify renders a proportionally taller attribution band.
+var ATTR_CROP       = 60;   // 180×180 and larger
+var ATTR_CROP_SMALL = 100;  // 144×168 (aplite / basalt / diorite / flint)
 
 // Geoapify is asked to render the map in 4 well-separated greys
 // (0 / 85 / 170 / 255), so a pixel's level is just the nearest of those. The
@@ -182,8 +185,8 @@ function getPlatform() {
 
 function getPlatformSize(platform) {
   var s = PLATFORM_SIZES[platform] || { w: 144, h: 168 };
-  // Request extra height so the watch can centre-crop off the attribution band.
-  return { w: s.w, h: s.h + 2 * ATTR_CROP };
+  var crop = (s.h <= 168) ? ATTR_CROP_SMALL : ATTR_CROP;
+  return { w: s.w, h: s.h + 2 * crop };
 }
 
 // Black & white platforms have no colour: render the four levels as black,

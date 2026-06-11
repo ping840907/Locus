@@ -82,13 +82,17 @@
 
 <script>
 // ---- must match the watchface (index.js) ---------------------------------
-var ATTR_CROP = 60;            // extra px per side, centre-cropped by the watch
+// Extra px added per side so the watch can centre-crop the Geoapify attribution
+// band off the bottom. Must match getPlatformSize() in index.js.
+// Small (144×168) platforms need more headroom for a proportionally taller band.
+var ATTR_CROP       = 60;   // 180×180 and larger
+var ATTR_CROP_SMALL = 100;  // 144×168
 var PLATFORMS = [
-  { label: '144x168 — aplite / diorite / flint (B&W)', w: 144, h: 168, bw: true  },
-  { label: '144x168 — basalt (colour)',                w: 144, h: 168, bw: false },
-  { label: '180x180 — chalk (round)',                  w: 180, h: 180, bw: false },
-  { label: '200x228 — emery',                          w: 200, h: 228, bw: false },
-  { label: '260x260 — gabbro (round)',                 w: 260, h: 260, bw: false }
+  { label: '144x168 — aplite / diorite / flint (B&W)', w: 144, h: 168, bw: true,  crop: ATTR_CROP_SMALL },
+  { label: '144x168 — basalt (colour)',                w: 144, h: 168, bw: false, crop: ATTR_CROP_SMALL },
+  { label: '180x180 — chalk (round)',                  w: 180, h: 180, bw: false, crop: ATTR_CROP       },
+  { label: '200x228 — emery',                          w: 200, h: 228, bw: false, crop: ATTR_CROP       },
+  { label: '260x260 — gabbro (round)',                 w: 260, h: 260, bw: false, crop: ATTR_CROP       }
 ];
 var GREY = { land: '#000000', water: '#555555', road: '#aaaaaa', label: '#ffffff' };
 
@@ -189,7 +193,7 @@ $('go').addEventListener('click', function () {
   if (!isFinite(lat) || !isFinite(lon)) { setStatus('Invalid lat/lon.'); return; }
   var zoom = parseInt($('zoom').value, 10) || 15;
   var showLabels = $('labels').checked;
-  var reqW = p.w, reqH = p.h + 2 * ATTR_CROP;
+  var reqW = p.w, reqH = p.h + 2 * p.crop;
 
   $('go').disabled = true;
   setStatus('Fetching style…');
