@@ -278,7 +278,7 @@ module.exports = [
         "type": "toggle",
         "messageKey": "SHOW_CENTER_DOT",
         "label": "Show location dot",
-        "defaultValue": true
+        "defaultValue": false
       },
       {
         "type": "toggle",
