@@ -75,17 +75,24 @@ static void clear_status_cb(void *ctx) {
   }
 }
 
+// Benign progress/OK messages auto-hide; errors stay on screen.
+static bool is_transient_status(const char *t) {
+  return strcmp(t, "Map up to date") == 0 ||
+         strcmp(t, "Locating...") == 0 ||
+         strcmp(t, "Loading map...") == 0;
+}
+
 static void set_status(const char *text) {
   strncpy(s_status, text, sizeof(s_status) - 1);
   s_status[sizeof(s_status) - 1] = '\0';
 
-  // Auto-hide a non-empty status after a few seconds so messages like
-  // "Map up to date" don't linger; an empty status clears immediately.
+  // Auto-hide benign/progress messages after a few seconds so they don't
+  // linger (e.g. "Map up to date"). Errors stay until the next status.
   if (s_status_timer) {
     app_timer_cancel(s_status_timer);
     s_status_timer = NULL;
   }
-  if (s_status[0] != '\0') {
+  if (s_status[0] != '\0' && is_transient_status(s_status)) {
     s_status_timer = app_timer_register(6000, clear_status_cb, NULL);
   }
 
