@@ -155,16 +155,10 @@ static void reload_custom_fonts(void) {
     s_custom_date_font = NULL;
   }
   switch (s_date_font) {
-    case 11:
-      s_custom_date_font = fonts_load_custom_font(resource_get_handle(
-        s_large_screen ? RESOURCE_ID_FONT_BITCOUNT_REG_28
-                       : RESOURCE_ID_FONT_BITCOUNT_REG_21));
-      break;
-    case 12:
-      s_custom_date_font = fonts_load_custom_font(resource_get_handle(
-        s_large_screen ? RESOURCE_ID_FONT_JERSEY_28
-                       : RESOURCE_ID_FONT_JERSEY_21));
-      break;
+    case 11: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_BITCOUNT_REG_21)); break;
+    case 12: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_21));        break;
+    case 13: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_BITCOUNT_REG_28)); break;
+    case 14: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_28));        break;
     default: break;
   }
 }
@@ -358,12 +352,15 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
     case 8:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);      date_h = 32; break;
     case 9:  date_font = fonts_get_system_font(FONT_KEY_DROID_SERIF_28_BOLD); date_h = 32; break;
     case 10: date_font = fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK);     date_h = 34; break;
-    case 11: // BitcountSingle Regular
-    case 12: // Jersey 25
-      date_font = s_custom_date_font
-          ? s_custom_date_font
-          : fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
-      date_h = large ? 32 : 24;
+    case 11: // Bitcount Regular · 21
+    case 12: // Jersey 25 · 21
+      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+      date_h = 24;
+      break;
+    case 13: // Bitcount Regular · 28
+    case 14: // Jersey 25 · 28
+      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
+      date_h = 32;
       break;
     default: // -1 = auto: pick by screen size
       if (large) {

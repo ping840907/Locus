@@ -425,8 +425,10 @@ module.exports = [
           { "label": "Gothic 28 Bold", "value": "8" },
           { "label": "Droid Serif 28 Bold", "value": "9" },
           { "label": "Bitham 30 Black", "value": "10" },
-          { "label": "Bitcount Regular · 28", "value": "11" },
-          { "label": "Jersey 25 · 28", "value": "12" }
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" },
+          { "label": "Bitcount Regular · 28", "value": "13" },
+          { "label": "Jersey 25 · 28", "value": "14" }
         ]
       },
 
@@ -449,8 +451,10 @@ module.exports = [
           { "label": "Gothic 28 Bold", "value": "8" },
           { "label": "Droid Serif 28 Bold", "value": "9" },
           { "label": "Bitham 30 Black", "value": "10" },
-          { "label": "Bitcount Regular · 28", "value": "11" },
-          { "label": "Jersey 25 · 28", "value": "12" }
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" },
+          { "label": "Bitcount Regular · 28", "value": "13" },
+          { "label": "Jersey 25 · 28", "value": "14" }
         ]
       }
     ]
