@@ -303,7 +303,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Preview all available fonts at <a href=\"https://developer.repebble.com/guides/app-resources/system-fonts/\">developer.repebble.com — System Fonts</a> (tap to open in external browser)."
+        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser."
       },
 
       // Time font — aplite / basalt / chalk / diorite / flint
@@ -322,9 +322,9 @@ module.exports = [
           { "label": "Bitham 42 · Medium", "value": "2" },
           { "label": "Bitham 42 · Bold", "value": "3" },
           { "label": "Roboto 49 · Bold", "value": "4" },
-          { "label": "Bitcount · Regular", "value": "10" },
-          { "label": "Bitcount · Bold", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 42", "value": "12" }
         ]
       },
 
@@ -346,9 +346,12 @@ module.exports = [
           { "label": "Roboto 49 · Bold", "value": "4" },
           { "label": "LECO 60", "value": "5" },
           { "label": "LECO 60 · Bold", "value": "6" },
-          { "label": "Bitcount · Regular", "value": "10" },
-          { "label": "Bitcount · Bold", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 42", "value": "12" },
+          { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60", "value": "14" },
+          { "label": "Jersey 25 · 60", "value": "15" }
         ]
       },
 
@@ -370,9 +373,12 @@ module.exports = [
           { "label": "Roboto 49 · Bold", "value": "4" },
           { "label": "LECO 60", "value": "5" },
           { "label": "LECO 60 · Bold", "value": "6" },
-          { "label": "Bitcount · Regular", "value": "10" },
-          { "label": "Bitcount · Bold", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 42", "value": "12" },
+          { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60", "value": "14" },
+          { "label": "Jersey 25 · 60", "value": "15" }
         ]
       },
 
@@ -395,8 +401,8 @@ module.exports = [
           { "label": "Gothic 28 Bold", "value": "8" },
           { "label": "Droid Serif 28 Bold", "value": "9" },
           { "label": "Bitham 30 Black", "value": "10" },
-          { "label": "Bitcount · Regular", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" }
         ]
       },
 
@@ -419,8 +425,8 @@ module.exports = [
           { "label": "Gothic 28 Bold", "value": "8" },
           { "label": "Droid Serif 28 Bold", "value": "9" },
           { "label": "Bitham 30 Black", "value": "10" },
-          { "label": "Bitcount · Regular", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 28", "value": "11" },
+          { "label": "Jersey 25 · 28", "value": "12" }
         ]
       },
 
@@ -443,8 +449,8 @@ module.exports = [
           { "label": "Gothic 28 Bold", "value": "8" },
           { "label": "Droid Serif 28 Bold", "value": "9" },
           { "label": "Bitham 30 Black", "value": "10" },
-          { "label": "Bitcount · Regular", "value": "11" },
-          { "label": "Jersey 25", "value": "12" }
+          { "label": "Bitcount Regular · 28", "value": "11" },
+          { "label": "Jersey 25 · 28", "value": "12" }
         ]
       }
     ]
