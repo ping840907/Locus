@@ -314,10 +314,10 @@ module.exports = [
         "defaultValue": "0",
         "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
         "options": [
-          { "label": "LECO 42", "value": "0" },
           { "label": "Bitham 34 · Medium", "value": "7" },
           { "label": "LECO 36 · Bold", "value": "8" },
           { "label": "LECO 38 · Bold", "value": "9" },
+          { "label": "LECO 42", "value": "0" },
           { "label": "Bitham 42 · Light", "value": "1" },
           { "label": "Bitham 42 · Medium", "value": "2" },
           { "label": "Bitham 42 · Bold", "value": "3" },
@@ -333,8 +333,6 @@ module.exports = [
         "defaultValue": "5",
         "capabilities": ["PLATFORM_EMERY"],
         "options": [
-          { "label": "LECO 60", "value": "5" },
-          { "label": "LECO 60 · Bold", "value": "6" },
           { "label": "Bitham 34 · Medium", "value": "7" },
           { "label": "LECO 36 · Bold", "value": "8" },
           { "label": "LECO 38 · Bold", "value": "9" },
@@ -342,7 +340,9 @@ module.exports = [
           { "label": "Bitham 42 · Light", "value": "1" },
           { "label": "Bitham 42 · Medium", "value": "2" },
           { "label": "Bitham 42 · Bold", "value": "3" },
-          { "label": "Roboto 49 · Bold", "value": "4" }
+          { "label": "Roboto 49 · Bold", "value": "4" },
+          { "label": "LECO 60", "value": "5" },
+          { "label": "LECO 60 · Bold", "value": "6" }
         ]
       },
 
