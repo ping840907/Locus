@@ -299,6 +299,173 @@ module.exports = [
     "items": [
       {
         "type": "heading",
+        "defaultValue": "Watchface fonts"
+      },
+      {
+        "type": "text",
+        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser."
+      },
+
+      // Time font — aplite / basalt / chalk / diorite / flint
+      {
+        "type": "select",
+        "messageKey": "TIME_FONT",
+        "label": "Time font",
+        "defaultValue": "0",
+        "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
+        "options": [
+          { "label": "Bitham 34 · Medium", "value": "7" },
+          { "label": "LECO 36 · Bold", "value": "8" },
+          { "label": "LECO 38 · Bold", "value": "9" },
+          { "label": "LECO 42", "value": "0" },
+          { "label": "Bitham 42 · Light", "value": "1" },
+          { "label": "Bitham 42 · Medium", "value": "2" },
+          { "label": "Bitham 42 · Bold", "value": "3" },
+          { "label": "Roboto 49 · Bold", "value": "4" },
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 60", "value": "12" }
+        ]
+      },
+
+      // Time font — Emery (Pebble Time 2, 200×228)
+      {
+        "type": "select",
+        "messageKey": "TIME_FONT",
+        "label": "Time font",
+        "defaultValue": "5",
+        "capabilities": ["PLATFORM_EMERY"],
+        "options": [
+          { "label": "Bitham 34 · Medium", "value": "7" },
+          { "label": "LECO 36 · Bold", "value": "8" },
+          { "label": "LECO 38 · Bold", "value": "9" },
+          { "label": "LECO 42", "value": "0" },
+          { "label": "Bitham 42 · Light", "value": "1" },
+          { "label": "Bitham 42 · Medium", "value": "2" },
+          { "label": "Bitham 42 · Bold", "value": "3" },
+          { "label": "Roboto 49 · Bold", "value": "4" },
+          { "label": "LECO 60", "value": "5" },
+          { "label": "LECO 60 · Bold", "value": "6" },
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 60", "value": "12" },
+          { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60", "value": "14" },
+          { "label": "Jersey 25 · 78", "value": "15" }
+        ]
+      },
+
+      // Time font — Gabbro (Pebble Round 2, 260×260)
+      {
+        "type": "select",
+        "messageKey": "TIME_FONT",
+        "label": "Time font",
+        "defaultValue": "5",
+        "capabilities": ["PLATFORM_GABBRO"],
+        "options": [
+          { "label": "Bitham 34 · Medium", "value": "7" },
+          { "label": "LECO 36 · Bold", "value": "8" },
+          { "label": "LECO 38 · Bold", "value": "9" },
+          { "label": "LECO 42", "value": "0" },
+          { "label": "Bitham 42 · Light", "value": "1" },
+          { "label": "Bitham 42 · Medium", "value": "2" },
+          { "label": "Bitham 42 · Bold", "value": "3" },
+          { "label": "Roboto 49 · Bold", "value": "4" },
+          { "label": "LECO 60", "value": "5" },
+          { "label": "LECO 60 · Bold", "value": "6" },
+          { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42", "value": "11" },
+          { "label": "Jersey 25 · 60", "value": "12" },
+          { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60", "value": "14" },
+          { "label": "Jersey 25 · 78", "value": "15" }
+        ]
+      },
+
+      // Date font — aplite / basalt / chalk / diorite / flint
+      {
+        "type": "select",
+        "messageKey": "DATE_FONT",
+        "label": "Date font",
+        "defaultValue": "3",
+        "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
+        "options": [
+          { "label": "Gothic 14", "value": "0" },
+          { "label": "Gothic 14 Bold", "value": "1" },
+          { "label": "Gothic 18", "value": "2" },
+          { "label": "Gothic 18 Bold", "value": "3" },
+          { "label": "Roboto Condensed 21", "value": "4" },
+          { "label": "Gothic 24", "value": "5" },
+          { "label": "Gothic 24 Bold", "value": "6" },
+          { "label": "Gothic 28", "value": "7" },
+          { "label": "Gothic 28 Bold", "value": "8" },
+          { "label": "Droid Serif 28 Bold", "value": "9" },
+          { "label": "Bitham 30 Black", "value": "10" },
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" }
+        ]
+      },
+
+      // Date font — Emery (Pebble Time 2, 200×228)
+      {
+        "type": "select",
+        "messageKey": "DATE_FONT",
+        "label": "Date font",
+        "defaultValue": "8",
+        "capabilities": ["PLATFORM_EMERY"],
+        "options": [
+          { "label": "Gothic 14", "value": "0" },
+          { "label": "Gothic 14 Bold", "value": "1" },
+          { "label": "Gothic 18", "value": "2" },
+          { "label": "Gothic 18 Bold", "value": "3" },
+          { "label": "Roboto Condensed 21", "value": "4" },
+          { "label": "Gothic 24", "value": "5" },
+          { "label": "Gothic 24 Bold", "value": "6" },
+          { "label": "Gothic 28", "value": "7" },
+          { "label": "Gothic 28 Bold", "value": "8" },
+          { "label": "Droid Serif 28 Bold", "value": "9" },
+          { "label": "Bitham 30 Black", "value": "10" },
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" },
+          { "label": "Bitcount Regular · 28", "value": "13" },
+          { "label": "Jersey 25 · 28", "value": "14" }
+        ]
+      },
+
+      // Date font — Gabbro (Pebble Round 2, 260×260)
+      {
+        "type": "select",
+        "messageKey": "DATE_FONT",
+        "label": "Date font",
+        "defaultValue": "8",
+        "capabilities": ["PLATFORM_GABBRO"],
+        "options": [
+          { "label": "Gothic 14", "value": "0" },
+          { "label": "Gothic 14 Bold", "value": "1" },
+          { "label": "Gothic 18", "value": "2" },
+          { "label": "Gothic 18 Bold", "value": "3" },
+          { "label": "Roboto Condensed 21", "value": "4" },
+          { "label": "Gothic 24", "value": "5" },
+          { "label": "Gothic 24 Bold", "value": "6" },
+          { "label": "Gothic 28", "value": "7" },
+          { "label": "Gothic 28 Bold", "value": "8" },
+          { "label": "Droid Serif 28 Bold", "value": "9" },
+          { "label": "Bitham 30 Black", "value": "10" },
+          { "label": "Bitcount Regular · 21", "value": "11" },
+          { "label": "Jersey 25 · 21", "value": "12" },
+          { "label": "Bitcount Regular · 28", "value": "13" },
+          { "label": "Jersey 25 · 28", "value": "14" }
+        ]
+      }
+    ]
+  },
+
+  // -------------------------------------------------------------------------
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
         "defaultValue": "Attribution"
       },
       {
