@@ -1,7 +1,7 @@
 {
   "name": "locus",
   "author": "sloth8497",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "MIT",
   "keywords": [
     "pebble-app"
@@ -78,7 +78,11 @@
         { "type": "font", "name": "FONT_BITCOUNT_REG_21",  "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
         { "type": "font", "name": "FONT_BITCOUNT_REG_28",  "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
         { "type": "font", "name": "FONT_JERSEY_21",        "file": "fonts/Jersey25-Regular.ttf",       "characterRegex": "[A-Za-z0-9 ]" },
-        { "type": "font", "name": "FONT_JERSEY_28",        "file": "fonts/Jersey25-Regular.ttf",       "characterRegex": "[A-Za-z0-9 ]" }
+        { "type": "font", "name": "FONT_JERSEY_28",        "file": "fonts/Jersey25-Regular.ttf",       "characterRegex": "[A-Za-z0-9 ]" },
+        { "type": "font", "name": "FONT_NORICAN_40",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_NORICAN_58",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_NORICAN_16",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" },
+        { "type": "font", "name": "FONT_NORICAN_22",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" }
       ]
     },
     "capabilities": [
