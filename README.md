@@ -11,7 +11,8 @@ clean, designed overlay.
   distance from the current map's centre — saving battery and data.
 * Fully configurable via [`@rebble/clay`](https://www.npmjs.com/package/@rebble/clay)
   `^1.0.10`: API key, refresh distance, follow-current vs. fixed location,
-  zoom, map style, watchface colours, and whether place / road names are shown.
+  zoom, map style, watchface colours, time / date fonts, and whether place /
+  road names are shown.
 * UI is in **English**; map labels follow the map's own **local language**
   (as provided by Geoapify).
 
@@ -80,21 +81,30 @@ doing, so you can diagnose problems without a computer:
 | `Decode failed` | PNG could not be decoded (often low memory). |
 | _(blank)_ | Map decoded and shown successfully. |
 
+Errors and in-progress messages stay on screen until replaced; the benign
+`Map up to date` message auto-hides after a few seconds.
+
 ### The overlay
 
-Time (large `LECO` numerals) and date are drawn over the map with a 1 px drop
-shadow so they stay legible over any map content, separated by a short accent
-divider. Time, date, and background colours, the date, and the centre location
-dot are all configurable.
+Time and date are drawn over the map with a 1 px drop shadow so they stay
+legible over any map content, separated by a short accent divider. Both fonts
+are selectable in the settings: a range of system fonts (LECO, Bitham, Roboto,
+Gothic, Droid Serif) plus two bundled custom fonts — **Bitcount Single**
+(Regular / Bold) and **Jersey 25** — with larger sizes offered on the big
+emery / gabbro screens. The default ("auto") picks a size to suit the screen.
+Time, date, and background colours, the date line, and the centre location dot
+are all configurable too.
 
 ---
 
 ## Project layout
 
 ```
-mapwatchface/
+Locus/
 ├── package.json        # Pebble manifest + @rebble/clay dependency + messageKeys
 ├── wscript             # Pebble build script
+├── resources/
+│   └── fonts/          # Bundled custom fonts (Bitcount Single, Jersey 25)
 ├── src/
 │   ├── c/
 │   │   └── main.c      # Watch app: drawing, config, PNG reassembly/decode
@@ -144,8 +154,9 @@ requests/day on the free tier). The map appears once a location is resolved.
 | **Show place / road names** | Toggle map labels (local-language). |
 | **Map colours** | Recolour the map's 4 layers: Land / Water / Roads / Labels. On black & white watches these become tone choices (black / white / dither / diagonal lines). |
 | **Time / Date / Background colour** | Watchface overlay colours. |
+| **Time font / Date font** | Pick the overlay fonts: system fonts (LECO, Bitham, Roboto, Gothic, Droid Serif) plus bundled Bitcount Single and Jersey 25. Emery and gabbro get extra large-size options. |
 | **Show date** | Toggle the date line. |
-| **Show location dot** | Toggle the centre marker. |
+| **Show location dot** | Toggle the centre marker (off by default). |
 | **Show status messages** | Toggle the bottom status line (Locating / Loading…). |
 
 ---
