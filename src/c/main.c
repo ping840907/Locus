@@ -131,9 +131,9 @@ static void reload_custom_fonts(void) {
       s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_BITCOUNT_BOLD_42));
       break;
     case 12:
-      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_42));
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_60));
       break;
-    // 60px variants — intended for Emery/Gabbro; fall back to 42px on smaller screens
+    // 60px/78px variants — intended for Emery/Gabbro; fall back to 42px on smaller screens
     case 13:
       s_custom_time_font = fonts_load_custom_font(resource_get_handle(
         s_large_screen ? RESOURCE_ID_FONT_BITCOUNT_REG_60 : RESOURCE_ID_FONT_BITCOUNT_REG_42));
@@ -144,7 +144,7 @@ static void reload_custom_fonts(void) {
       break;
     case 15:
       s_custom_time_font = fonts_load_custom_font(resource_get_handle(
-        s_large_screen ? RESOURCE_ID_FONT_JERSEY_60 : RESOURCE_ID_FONT_JERSEY_42));
+        s_large_screen ? RESOURCE_ID_FONT_JERSEY_78 : RESOURCE_ID_FONT_JERSEY_60));
       break;
     default: break;
   }
@@ -311,19 +311,29 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
       break;
     case 10: // Bitcount Regular 42
     case 11: // Bitcount Bold 42
-    case 12: // Jersey 25 · 42
       time_font = s_custom_time_font
           ? s_custom_time_font
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
       time_h = 44;
       break;
-    case 13: // Bitcount Regular 60
-    case 14: // Bitcount Bold 60
-    case 15: // Jersey 25 · 60
+    case 12: // Jersey 25 · 60
       time_font = s_custom_time_font
           ? s_custom_time_font
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
       time_h = 64;
+      break;
+    case 13: // Bitcount Regular 60
+    case 14: // Bitcount Bold 60
+      time_font = s_custom_time_font
+          ? s_custom_time_font
+          : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 64;
+      break;
+    case 15: // Jersey 25 · 78
+      time_font = s_custom_time_font
+          ? s_custom_time_font
+          : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 82;
       break;
     default: // -1 = auto: pick by screen size
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM

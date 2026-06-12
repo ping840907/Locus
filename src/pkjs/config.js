@@ -324,7 +324,7 @@ module.exports = [
           { "label": "Roboto 49 · Bold", "value": "4" },
           { "label": "Bitcount Regular · 42", "value": "10" },
           { "label": "Bitcount Bold · 42", "value": "11" },
-          { "label": "Jersey 25 · 42", "value": "12" }
+          { "label": "Jersey 25 · 60", "value": "12" }
         ]
       },
 
@@ -348,10 +348,10 @@ module.exports = [
           { "label": "LECO 60 · Bold", "value": "6" },
           { "label": "Bitcount Regular · 42", "value": "10" },
           { "label": "Bitcount Bold · 42", "value": "11" },
-          { "label": "Jersey 25 · 42", "value": "12" },
+          { "label": "Jersey 25 · 60", "value": "12" },
           { "label": "Bitcount Regular · 60", "value": "13" },
           { "label": "Bitcount Bold · 60", "value": "14" },
-          { "label": "Jersey 25 · 60", "value": "15" }
+          { "label": "Jersey 25 · 78", "value": "15" }
         ]
       },
 
@@ -375,10 +375,10 @@ module.exports = [
           { "label": "LECO 60 · Bold", "value": "6" },
           { "label": "Bitcount Regular · 42", "value": "10" },
           { "label": "Bitcount Bold · 42", "value": "11" },
-          { "label": "Jersey 25 · 42", "value": "12" },
+          { "label": "Jersey 25 · 60", "value": "12" },
           { "label": "Bitcount Regular · 60", "value": "13" },
           { "label": "Bitcount Bold · 60", "value": "14" },
-          { "label": "Jersey 25 · 60", "value": "15" }
+          { "label": "Jersey 25 · 78", "value": "15" }
         ]
       },
 
