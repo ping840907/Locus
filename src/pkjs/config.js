@@ -303,7 +303,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser."
+        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser. Note: Bitcount, Jersey 25, and Norican are custom fonts and not built-in system fonts."
       },
 
       // Time font — aplite / basalt / chalk / diorite / flint
@@ -315,13 +315,13 @@ module.exports = [
         "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
         "options": [
           { "label": "── Bitcount ──",        "value": "" },
-          { "label": "Bitcount Bold · 42",    "value": "11" },
           { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42",    "value": "11" },
           { "label": "── Bitham ──",          "value": "" },
           { "label": "Bitham 34 · Medium",    "value": "7" },
-          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "Bitham 42 · Light",     "value": "1" },
           { "label": "Bitham 42 · Medium",    "value": "2" },
+          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "── Jersey 25 ──",       "value": "" },
           { "label": "Jersey 25 · 60",        "value": "12" },
           { "label": "── LECO ──",            "value": "" },
@@ -344,15 +344,15 @@ module.exports = [
         "capabilities": ["PLATFORM_EMERY"],
         "options": [
           { "label": "── Bitcount ──",        "value": "" },
-          { "label": "Bitcount Bold · 42",    "value": "11" },
-          { "label": "Bitcount Bold · 60",    "value": "14" },
           { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42",    "value": "11" },
           { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60",    "value": "14" },
           { "label": "── Bitham ──",          "value": "" },
           { "label": "Bitham 34 · Medium",    "value": "7" },
-          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "Bitham 42 · Light",     "value": "1" },
           { "label": "Bitham 42 · Medium",    "value": "2" },
+          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "── Jersey 25 ──",       "value": "" },
           { "label": "Jersey 25 · 60",        "value": "12" },
           { "label": "Jersey 25 · 78",        "value": "15" },
@@ -379,15 +379,15 @@ module.exports = [
         "capabilities": ["PLATFORM_GABBRO"],
         "options": [
           { "label": "── Bitcount ──",        "value": "" },
-          { "label": "Bitcount Bold · 42",    "value": "11" },
-          { "label": "Bitcount Bold · 60",    "value": "14" },
           { "label": "Bitcount Regular · 42", "value": "10" },
+          { "label": "Bitcount Bold · 42",    "value": "11" },
           { "label": "Bitcount Regular · 60", "value": "13" },
+          { "label": "Bitcount Bold · 60",    "value": "14" },
           { "label": "── Bitham ──",          "value": "" },
           { "label": "Bitham 34 · Medium",    "value": "7" },
-          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "Bitham 42 · Light",     "value": "1" },
           { "label": "Bitham 42 · Medium",    "value": "2" },
+          { "label": "Bitham 42 · Bold",      "value": "3" },
           { "label": "── Jersey 25 ──",       "value": "" },
           { "label": "Jersey 25 · 60",        "value": "12" },
           { "label": "Jersey 25 · 78",        "value": "15" },
