@@ -90,8 +90,9 @@ Time and date are drawn over the map with a 1 px drop shadow so they stay
 legible over any map content, separated by a short accent divider. Both fonts
 are selectable in the settings: a range of system fonts (LECO, Bitham, Roboto,
 Gothic, Droid Serif) plus two bundled custom fonts — **Bitcount Single**
-(Regular / Bold) and **Jersey 25** — with larger sizes offered on the big
-emery / gabbro screens. The default ("auto") picks a size to suit the screen.
+(Regular / Bold) and **Jersey 25**. The choice is what-you-see-is-what-you-get:
+every option's label states its pixel size, and each platform's dropdown only
+lists sizes that fit its screen (emery / gabbro get extra large-size options).
 Time, date, and background colours, the date line, and the centre location dot
 are all configurable too.
 
