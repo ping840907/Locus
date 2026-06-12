@@ -303,7 +303,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser. Note: Bitcount, Jersey 25, and Norican are custom fonts and not built-in system fonts."
+        "defaultValue": "Preview all available fonts at developer.repebble.com/guides/app-resources/system-fonts/ — open this URL manually in a browser. Note: Bitcount, Jersey 25, and Norican are custom fonts, so they are not listed in the official font documentation."
       },
 
       // Time font — aplite / basalt / chalk / diorite / flint
@@ -513,14 +513,8 @@ module.exports = [
   {
     "type": "section",
     "items": [
-      {
-        "type": "heading",
-        "defaultValue": "Attribution"
-      },
-      {
-        "type": "text",
-        "defaultValue": "Powered by <a href=\"https://www.geoapify.com/\">Geoapify</a> — map data © OpenMapTiles © OpenStreetMap contributors."
-      }
+      { "type": "heading", "defaultValue": "Attribution" },
+      { "type": "text", "defaultValue": "Powered by <a href=\"https://www.geoapify.com/\">Geoapify</a> — map data © OpenMapTiles © OpenStreetMap contributors." }
     ]
   },
 
