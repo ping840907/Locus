@@ -79,10 +79,10 @@
         { "type": "font", "name": "FONT_BITCOUNT_REG_28",  "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
         { "type": "font", "name": "FONT_JERSEY_21",        "file": "fonts/Jersey25-Regular.ttf",       "characterRegex": "[A-Za-z0-9 ]" },
         { "type": "font", "name": "FONT_JERSEY_28",        "file": "fonts/Jersey25-Regular.ttf",       "characterRegex": "[A-Za-z0-9 ]" },
-        { "type": "font", "name": "FONT_NORICAN_42",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
-        { "type": "font", "name": "FONT_NORICAN_60",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
-        { "type": "font", "name": "FONT_NORICAN_21",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" },
-        { "type": "font", "name": "FONT_NORICAN_28",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" }
+        { "type": "font", "name": "FONT_NORICAN_32",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_NORICAN_48",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_NORICAN_16",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" },
+        { "type": "font", "name": "FONT_NORICAN_22",       "file": "fonts/NoricanRegular.ttf",          "characterRegex": "[A-Za-z0-9 ]" }
       ]
     },
     "capabilities": [

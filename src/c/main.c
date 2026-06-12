@@ -147,11 +147,11 @@ static void reload_custom_fonts(void) {
         s_large_screen ? RESOURCE_ID_FONT_JERSEY_78 : RESOURCE_ID_FONT_JERSEY_60));
       break;
     case 16:
-      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_42));
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_32));
       break;
     case 17:
       s_custom_time_font = fonts_load_custom_font(resource_get_handle(
-        s_large_screen ? RESOURCE_ID_FONT_NORICAN_60 : RESOURCE_ID_FONT_NORICAN_42));
+        s_large_screen ? RESOURCE_ID_FONT_NORICAN_48 : RESOURCE_ID_FONT_NORICAN_32));
       break;
     default: break;
   }
@@ -166,8 +166,8 @@ static void reload_custom_fonts(void) {
     case 12: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_21));        break;
     case 13: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_BITCOUNT_REG_28)); break;
     case 14: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_JERSEY_28));        break;
-    case 15: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_21));       break;
-    case 16: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_28));       break;
+    case 15: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_16));       break;
+    case 16: s_custom_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_22));       break;
     default: break;
   }
 }
@@ -344,17 +344,17 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
       time_h = 82;
       break;
-    case 16: // Norican Regular · 42
+    case 16: // Norican Regular · 32
       time_font = s_custom_time_font
           ? s_custom_time_font
-          : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-      time_h = 44;
+          : fonts_get_system_font(FONT_KEY_LECO_36_BOLD_NUMBERS);
+      time_h = 36;
       break;
-    case 17: // Norican Regular · 60
+    case 17: // Norican Regular · 48
       time_font = s_custom_time_font
           ? s_custom_time_font
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-      time_h = 64;
+      time_h = 52;
       break;
     default: // -1 = auto: pick by screen size
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
@@ -393,13 +393,13 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
       date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
       date_h = 32;
       break;
-    case 15: // Norican Regular · 21
-      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
-      date_h = 24;
+    case 15: // Norican Regular · 16
+      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_14_BOLD);
+      date_h = 20;
       break;
-    case 16: // Norican Regular · 28
-      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
-      date_h = 32;
+    case 16: // Norican Regular · 22
+      date_font = s_custom_date_font ? s_custom_date_font : fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+      date_h = 26;
       break;
     default: // -1 = auto: pick by screen size
       if (large) {
