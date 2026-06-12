@@ -68,7 +68,27 @@
           "name": "IMAGE_MENU_ICON",
           "file": "images/icon-25.png",
           "menuIcon": true
-        }
+        },
+
+        // BitcountSingle-Regular — time (digits + colon only)
+        { "type": "font", "name": "FONT_BITCOUNT_REG_42", "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_BITCOUNT_REG_60", "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[0-9:]" },
+
+        // BitcountSingle-Bold — time (digits + colon only)
+        { "type": "font", "name": "FONT_BITCOUNT_BOLD_42", "file": "fonts/BitcountSingle-Bold.ttf", "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_BITCOUNT_BOLD_60", "file": "fonts/BitcountSingle-Bold.ttf", "characterRegex": "[0-9:]" },
+
+        // Jersey25-Regular — time (digits + colon only)
+        { "type": "font", "name": "FONT_JERSEY_42", "file": "fonts/Jersey25-Regular.ttf", "characterRegex": "[0-9:]" },
+        { "type": "font", "name": "FONT_JERSEY_60", "file": "fonts/Jersey25-Regular.ttf", "characterRegex": "[0-9:]" },
+
+        // BitcountSingle-Regular — date (abbreviated day + date + month)
+        { "type": "font", "name": "FONT_BITCOUNT_REG_21", "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
+        { "type": "font", "name": "FONT_BITCOUNT_REG_28", "file": "fonts/BitcountSingle-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
+
+        // Jersey25-Regular — date
+        { "type": "font", "name": "FONT_JERSEY_21", "file": "fonts/Jersey25-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" },
+        { "type": "font", "name": "FONT_JERSEY_28", "file": "fonts/Jersey25-Regular.ttf", "characterRegex": "[A-Za-z0-9 ]" }
       ]
     },
     "capabilities": [

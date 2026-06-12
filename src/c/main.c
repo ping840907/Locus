@@ -65,6 +65,12 @@ static bool s_show_status = DEFAULT_SHOW_STATUS;
 static int  s_time_font = DEFAULT_TIME_FONT;
 static int  s_date_font = DEFAULT_DATE_FONT;
 
+// Custom font caches (NULL when a system font is selected).
+// Set by reload_custom_fonts(); freed in window_unload.
+static bool  s_large_screen = false;
+static GFont s_custom_time_font = NULL;
+static GFont s_custom_date_font = NULL;
+
 // Cached time strings
 static char s_time_buf[8];
 static char s_date_buf[24];
@@ -103,6 +109,55 @@ static void set_status(const char *text) {
 
   if (s_overlay_layer) {
     layer_mark_dirty(s_overlay_layer);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Custom font management
+// ---------------------------------------------------------------------------
+
+static void reload_custom_fonts(void) {
+  // Time font
+  if (s_custom_time_font) {
+    fonts_unload_custom_font(s_custom_time_font);
+    s_custom_time_font = NULL;
+  }
+  switch (s_time_font) {
+    case 10:
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(
+        s_large_screen ? RESOURCE_ID_FONT_BITCOUNT_REG_60
+                       : RESOURCE_ID_FONT_BITCOUNT_REG_42));
+      break;
+    case 11:
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(
+        s_large_screen ? RESOURCE_ID_FONT_BITCOUNT_BOLD_60
+                       : RESOURCE_ID_FONT_BITCOUNT_BOLD_42));
+      break;
+    case 12:
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(
+        s_large_screen ? RESOURCE_ID_FONT_JERSEY_60
+                       : RESOURCE_ID_FONT_JERSEY_42));
+      break;
+    default: break;
+  }
+
+  // Date font
+  if (s_custom_date_font) {
+    fonts_unload_custom_font(s_custom_date_font);
+    s_custom_date_font = NULL;
+  }
+  switch (s_date_font) {
+    case 11:
+      s_custom_date_font = fonts_load_custom_font(resource_get_handle(
+        s_large_screen ? RESOURCE_ID_FONT_BITCOUNT_REG_28
+                       : RESOURCE_ID_FONT_BITCOUNT_REG_21));
+      break;
+    case 12:
+      s_custom_date_font = fonts_load_custom_font(resource_get_handle(
+        s_large_screen ? RESOURCE_ID_FONT_JERSEY_28
+                       : RESOURCE_ID_FONT_JERSEY_21));
+      break;
+    default: break;
   }
 }
 
@@ -252,6 +307,14 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
       time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
       time_h = 44;
       break;
+    case 10: // BitcountSingle Regular
+    case 11: // BitcountSingle Bold
+    case 12: // Jersey 25
+      time_font = s_custom_time_font
+          ? s_custom_time_font
+          : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = large ? 64 : 44;
+      break;
     default: // -1 = auto: pick by screen size
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM
       if (large) {
@@ -279,6 +342,13 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
     case 8:  date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);      date_h = 32; break;
     case 9:  date_font = fonts_get_system_font(FONT_KEY_DROID_SERIF_28_BOLD); date_h = 32; break;
     case 10: date_font = fonts_get_system_font(FONT_KEY_BITHAM_30_BLACK);     date_h = 34; break;
+    case 11: // BitcountSingle Regular
+    case 12: // Jersey 25
+      date_font = s_custom_date_font
+          ? s_custom_date_font
+          : fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+      date_h = large ? 32 : 24;
+      break;
     default: // -1 = auto: pick by screen size
       if (large) {
         date_font = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);
@@ -405,6 +475,7 @@ static void finalize_image(void) {
 
 static void apply_config(DictionaryIterator *iter) {
   bool changed = false;
+  bool fonts_changed = false;
 
   Tuple *t;
 
@@ -460,6 +531,7 @@ static void apply_config(DictionaryIterator *iter) {
     s_time_font = v;
     persist_write_int(PERSIST_TIME_FONT, v);
     changed = true;
+    fonts_changed = true;
   }
   t = dict_find(iter, MESSAGE_KEY_DATE_FONT);
   if (t) {
@@ -467,6 +539,10 @@ static void apply_config(DictionaryIterator *iter) {
     s_date_font = v;
     persist_write_int(PERSIST_DATE_FONT, v);
     changed = true;
+    fonts_changed = true;
+  }
+  if (fonts_changed) {
+    reload_custom_fonts();
   }
 
   if (changed) {
@@ -583,6 +659,8 @@ static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
 
+  s_large_screen = (bounds.size.w >= 200);
+
   s_canvas_layer = layer_create(bounds);
   layer_set_update_proc(s_canvas_layer, canvas_update_proc);
   layer_add_child(root, s_canvas_layer);
@@ -591,10 +669,19 @@ static void window_load(Window *window) {
   layer_set_update_proc(s_overlay_layer, overlay_update_proc);
   layer_add_child(root, s_overlay_layer);
 
+  reload_custom_fonts(); // load any custom font saved in persist storage
   update_time_strings();
 }
 
 static void window_unload(Window *window) {
+  if (s_custom_time_font) {
+    fonts_unload_custom_font(s_custom_time_font);
+    s_custom_time_font = NULL;
+  }
+  if (s_custom_date_font) {
+    fonts_unload_custom_font(s_custom_date_font);
+    s_custom_date_font = NULL;
+  }
   layer_destroy(s_canvas_layer);
   layer_destroy(s_overlay_layer);
 }
