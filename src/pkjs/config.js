@@ -346,7 +346,7 @@ module.exports = [
         ]
       },
 
-      // Time font — Gabbro (Pebble 2 HR, 260×260)
+      // Time font — Gabbro (Pebble Round 2, 260×260)
       {
         "type": "select",
         "messageKey": "TIME_FONT",
@@ -354,8 +354,6 @@ module.exports = [
         "defaultValue": "5",
         "capabilities": ["PLATFORM_GABBRO"],
         "options": [
-          { "label": "LECO 60", "value": "5" },
-          { "label": "LECO 60 · Bold", "value": "6" },
           { "label": "Bitham 34 · Medium", "value": "7" },
           { "label": "LECO 36 · Bold", "value": "8" },
           { "label": "LECO 38 · Bold", "value": "9" },
@@ -363,7 +361,9 @@ module.exports = [
           { "label": "Bitham 42 · Light", "value": "1" },
           { "label": "Bitham 42 · Medium", "value": "2" },
           { "label": "Bitham 42 · Bold", "value": "3" },
-          { "label": "Roboto 49 · Bold", "value": "4" }
+          { "label": "Roboto 49 · Bold", "value": "4" },
+          { "label": "LECO 60", "value": "5" },
+          { "label": "LECO 60 · Bold", "value": "6" },
         ]
       },
 
@@ -411,7 +411,7 @@ module.exports = [
         ]
       },
 
-      // Date font — Gabbro (Pebble 2 HR, 260×260)
+      // Date font — Gabbro (Pebble Round 2, 260×260)
       {
         "type": "select",
         "messageKey": "DATE_FONT",
