@@ -305,34 +305,120 @@ module.exports = [
         "type": "text",
         "defaultValue": "Preview all available fonts at <a href=\"https://developer.repebble.com/guides/app-resources/system-fonts/\">developer.repebble.com — System Fonts</a> (tap to open in external browser)."
       },
+
+      // Time font — aplite / basalt / chalk / diorite / flint
       {
         "type": "select",
         "messageKey": "TIME_FONT",
         "label": "Time font",
-        "defaultValue": "-1",
+        "defaultValue": "0",
+        "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
         "options": [
-          { "label": "Auto (platform default)", "value": "-1" },
-          { "label": "─── All platforms ───", "value": "-1" },
+          { "label": "LECO 42 · Numbers", "value": "0" },
+          { "label": "Bitham 34 · Medium · Numbers", "value": "7" },
+          { "label": "LECO 36 Bold · Numbers", "value": "8" },
+          { "label": "LECO 38 Bold · Numbers", "value": "9" },
+          { "label": "Bitham 42 · Light", "value": "1" },
+          { "label": "Bitham 42 · Medium · Numbers", "value": "2" },
+          { "label": "Bitham 42 · Bold", "value": "3" },
+          { "label": "Roboto Bold · 49 (subset)", "value": "4" }
+        ]
+      },
+
+      // Time font — Emery (Pebble Time 2, 200×228)
+      {
+        "type": "select",
+        "messageKey": "TIME_FONT",
+        "label": "Time font",
+        "defaultValue": "5",
+        "capabilities": ["PLATFORM_EMERY"],
+        "options": [
+          { "label": "LECO 60 · Numbers + AM/PM", "value": "5" },
+          { "label": "LECO 60 Bold · Numbers + AM/PM", "value": "6" },
+          { "label": "Bitham 34 · Medium · Numbers", "value": "7" },
+          { "label": "LECO 36 Bold · Numbers", "value": "8" },
+          { "label": "LECO 38 Bold · Numbers", "value": "9" },
           { "label": "LECO 42 · Numbers", "value": "0" },
           { "label": "Bitham 42 · Light", "value": "1" },
           { "label": "Bitham 42 · Medium · Numbers", "value": "2" },
           { "label": "Bitham 42 · Bold", "value": "3" },
-          { "label": "Roboto Bold · 49 (subset)", "value": "4" },
+          { "label": "Roboto Bold · 49 (subset)", "value": "4" }
+        ]
+      },
+
+      // Time font — Gabbro (Pebble 2 HR, 260×260)
+      {
+        "type": "select",
+        "messageKey": "TIME_FONT",
+        "label": "Time font",
+        "defaultValue": "5",
+        "capabilities": ["PLATFORM_GABBRO"],
+        "options": [
+          { "label": "LECO 60 · Numbers + AM/PM", "value": "5" },
+          { "label": "LECO 60 Bold · Numbers + AM/PM", "value": "6" },
           { "label": "Bitham 34 · Medium · Numbers", "value": "7" },
           { "label": "LECO 36 Bold · Numbers", "value": "8" },
           { "label": "LECO 38 Bold · Numbers", "value": "9" },
-          { "label": "─── Emery & Gabbro only ───", "value": "-1" },
-          { "label": "LECO 60 · Numbers + AM/PM", "value": "5" },
-          { "label": "LECO 60 Bold · Numbers + AM/PM", "value": "6" }
+          { "label": "LECO 42 · Numbers", "value": "0" },
+          { "label": "Bitham 42 · Light", "value": "1" },
+          { "label": "Bitham 42 · Medium · Numbers", "value": "2" },
+          { "label": "Bitham 42 · Bold", "value": "3" },
+          { "label": "Roboto Bold · 49 (subset)", "value": "4" }
         ]
       },
+
+      // Date font — aplite / basalt / chalk / diorite / flint
       {
         "type": "select",
         "messageKey": "DATE_FONT",
         "label": "Date font",
-        "defaultValue": "-1",
+        "defaultValue": "3",
+        "capabilities": ["NOT_PLATFORM_EMERY", "NOT_PLATFORM_GABBRO"],
         "options": [
-          { "label": "Auto (platform default)", "value": "-1" },
+          { "label": "Gothic 14", "value": "0" },
+          { "label": "Gothic 14 Bold", "value": "1" },
+          { "label": "Gothic 18", "value": "2" },
+          { "label": "Gothic 18 Bold", "value": "3" },
+          { "label": "Roboto Condensed 21", "value": "4" },
+          { "label": "Gothic 24", "value": "5" },
+          { "label": "Gothic 24 Bold", "value": "6" },
+          { "label": "Gothic 28", "value": "7" },
+          { "label": "Gothic 28 Bold", "value": "8" },
+          { "label": "Droid Serif 28 Bold", "value": "9" },
+          { "label": "Bitham 30 Black", "value": "10" }
+        ]
+      },
+
+      // Date font — Emery (Pebble Time 2, 200×228)
+      {
+        "type": "select",
+        "messageKey": "DATE_FONT",
+        "label": "Date font",
+        "defaultValue": "8",
+        "capabilities": ["PLATFORM_EMERY"],
+        "options": [
+          { "label": "Gothic 14", "value": "0" },
+          { "label": "Gothic 14 Bold", "value": "1" },
+          { "label": "Gothic 18", "value": "2" },
+          { "label": "Gothic 18 Bold", "value": "3" },
+          { "label": "Roboto Condensed 21", "value": "4" },
+          { "label": "Gothic 24", "value": "5" },
+          { "label": "Gothic 24 Bold", "value": "6" },
+          { "label": "Gothic 28", "value": "7" },
+          { "label": "Gothic 28 Bold", "value": "8" },
+          { "label": "Droid Serif 28 Bold", "value": "9" },
+          { "label": "Bitham 30 Black", "value": "10" }
+        ]
+      },
+
+      // Date font — Gabbro (Pebble 2 HR, 260×260)
+      {
+        "type": "select",
+        "messageKey": "DATE_FONT",
+        "label": "Date font",
+        "defaultValue": "8",
+        "capabilities": ["PLATFORM_GABBRO"],
+        "options": [
           { "label": "Gothic 14", "value": "0" },
           { "label": "Gothic 14 Bold", "value": "1" },
           { "label": "Gothic 18", "value": "2" },
