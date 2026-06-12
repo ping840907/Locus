@@ -147,11 +147,11 @@ static void reload_custom_fonts(void) {
         s_large_screen ? RESOURCE_ID_FONT_JERSEY_78 : RESOURCE_ID_FONT_JERSEY_60));
       break;
     case 16:
-      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_32));
+      s_custom_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_NORICAN_40));
       break;
     case 17:
       s_custom_time_font = fonts_load_custom_font(resource_get_handle(
-        s_large_screen ? RESOURCE_ID_FONT_NORICAN_48 : RESOURCE_ID_FONT_NORICAN_32));
+        s_large_screen ? RESOURCE_ID_FONT_NORICAN_58 : RESOURCE_ID_FONT_NORICAN_40));
       break;
     default: break;
   }
@@ -344,17 +344,17 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
       time_h = 82;
       break;
-    case 16: // Norican Regular · 32
-      time_font = s_custom_time_font
-          ? s_custom_time_font
-          : fonts_get_system_font(FONT_KEY_LECO_36_BOLD_NUMBERS);
-      time_h = 36;
-      break;
-    case 17: // Norican Regular · 48
+    case 16: // Norican Regular · 40
       time_font = s_custom_time_font
           ? s_custom_time_font
           : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-      time_h = 52;
+      time_h = 44;
+      break;
+    case 17: // Norican Regular · 58
+      time_font = s_custom_time_font
+          ? s_custom_time_font
+          : fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+      time_h = 62;
       break;
     default: // -1 = auto: pick by screen size
 #ifdef FONT_KEY_LECO_60_NUMBERS_AM_PM

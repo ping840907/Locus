@@ -325,7 +325,7 @@ module.exports = [
           { "label": "Bitcount Regular · 42", "value": "10" },
           { "label": "Bitcount Bold · 42", "value": "11" },
           { "label": "Jersey 25 · 60", "value": "12" },
-          { "label": "Norican Regular · 32", "value": "16" }
+          { "label": "Norican Regular · 40", "value": "16" }
         ]
       },
 
@@ -353,8 +353,8 @@ module.exports = [
           { "label": "Bitcount Regular · 60", "value": "13" },
           { "label": "Bitcount Bold · 60", "value": "14" },
           { "label": "Jersey 25 · 78", "value": "15" },
-          { "label": "Norican Regular · 32", "value": "16" },
-          { "label": "Norican Regular · 48", "value": "17" }
+          { "label": "Norican Regular · 40", "value": "16" },
+          { "label": "Norican Regular · 58", "value": "17" }
         ]
       },
 
@@ -382,8 +382,8 @@ module.exports = [
           { "label": "Bitcount Regular · 60", "value": "13" },
           { "label": "Bitcount Bold · 60", "value": "14" },
           { "label": "Jersey 25 · 78", "value": "15" },
-          { "label": "Norican Regular · 32", "value": "16" },
-          { "label": "Norican Regular · 48", "value": "17" }
+          { "label": "Norican Regular · 40", "value": "16" },
+          { "label": "Norican Regular · 58", "value": "17" }
         ]
       },
 
