@@ -383,7 +383,7 @@ function resolveStyleCustomization(settings, cb) {
   var showLabels = !!settings.SHOW_LABELS;
   var style = settings.MAP_STYLE || 'dark-matter';
   // The "v" version invalidates caches when the customization logic changes.
-  var cacheKey = 'stylecust:v5:' + style + ':' + (showLabels ? 1 : 0);
+  var cacheKey = 'stylecust:v6:' + style + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
   if (cached !== null) {
     try { cb(JSON.parse(cached)); return; } catch (e) { /* refetch */ }
@@ -432,7 +432,7 @@ function resolveStyleCustomization(settings, cb) {
 
 // Signature of the parameters that change the Geoapify SOURCE image.
 function fetchSignature(settings, size) {
-  return ['v2', settings.LOCATION_MODE, settings.MAP_STYLE, settings.ZOOM,
+  return ['v3', settings.LOCATION_MODE, settings.MAP_STYLE, settings.ZOOM,
           settings.SHOW_LABELS ? 1 : 0, size.w, size.h].join('|');
 }
 
@@ -521,12 +521,25 @@ function buildMapImage(arrayBuffer, render) {
     var r = px[i], g = px[i + 1], b = px[i + 2];
     var level = 0; // default to background (black)
 
-    if (b > r && b > g) {
-      level = 3; // labels (blue)
-    } else if (g > r && g >= b) {
-      level = 2; // roads (green)
-    } else if (r >= g && r >= b && r > 0) {
-      level = 1; // water (red)
+    var max = Math.max(r, g, b);
+    var min = Math.min(r, g, b);
+
+    // Filter out very dark anti-aliasing artifacts from being classified as a color
+    if (max >= 43) {
+      if (max - min < 20) {
+        // Pixel is greyscale (like anti-aliased label halos against background or other bright artifacts)
+        if (max > 128) {
+          level = 3; // bright greyscale -> labels
+        } else {
+          level = 0; // dark greyscale -> background
+        }
+      } else if (b === max) {
+        level = 3; // labels (blue)
+      } else if (g === max) {
+        level = 2; // roads (green)
+      } else if (r === max) {
+        level = 1; // water (red)
+      }
     }
 
     if (render.bw) {
