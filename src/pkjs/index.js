@@ -28,12 +28,6 @@ var UPNG = require('upng-js');
 var ATTR_CROP       = 60;   // 180×180 and larger
 var ATTR_CROP_SMALL = 100;  // 144×168 (aplite / basalt / diorite / flint)
 
-// Geoapify is asked to render the map in 4 well-separated greys
-// (0 / 85 / 170 / 255), so a pixel's level is just the nearest of those. The
-// thresholds are the midpoints; anti-aliased edge pixels snap to the closest.
-// 0 = land/background, 1 = water, 2 = roads, 3 = labels/highlights.
-var LEVEL_THRESHOLDS = [43, 128, 213];
-
 // Default map palette (a monochrome ramp matching the classic dark look).
 var DEFAULT_MAP_COLORS = [0x000000, 0x555555, 0xAAAAAA, 0xFFFFFF];
 
@@ -307,43 +301,43 @@ function haversine(lat1, lon1, lat2, lon2) {
 // Map URL
 // ---------------------------------------------------------------------------
 
-// Canonical greys we force Geoapify to render each semantic layer group as, so
-// the phone can bucket pixels into 4 levels deterministically (by nearest of
-// 0/85/170/255). These are NOT the final colours - the watch shows the user's
+// Canonical colors we force Geoapify to render each semantic layer group as, so
+// the phone can bucket pixels into 4 levels deterministically (by maximum RGB channel).
+// These are NOT the final colours - the watch shows the user's
 // palette; these are just well-separated markers per layer group.
-var GREY_LAND  = '#000000'; // level 0
-var GREY_WATER = '#555555'; // level 1
-var GREY_ROAD  = '#aaaaaa'; // level 2
-var GREY_LABEL = '#ffffff'; // level 3
+var COLOR_LAND  = '#000000'; // level 0 (black)
+var COLOR_WATER = '#ff0000'; // level 1 (red)
+var COLOR_ROAD  = '#00ff00'; // level 2 (green)
+var COLOR_LABEL = '#0000ff'; // level 3 (blue)
 
 // Fallback recolour (array of {layer,color}) for the canonical dark-matter
 // layer ids, used if the style JSON can't be fetched.
 function styleCustomFallback(showLabels) {
-  // Casings + simple single-line roads get the road grey; the black "inner"
+  // Casings + simple single-line roads get the road color; the black "inner"
   // lines are hidden (see buildStyleCustomization).
-  var roadGrey = ['highway_motorway_casing', 'highway_motorway_subtle',
+  var roadColor = ['highway_motorway_casing', 'highway_motorway_subtle',
     'highway_major_casing', 'highway_major_subtle', 'highway_minor',
     'highway_path', 'railway', 'railway_minor', 'railway_transit'];
   var roadHide = ['highway_motorway_inner', 'highway_major_inner'];
   var list = [
-    { layer: 'background', color: GREY_LAND },
-    { layer: 'water', color: GREY_WATER },
-    { layer: 'waterway', color: GREY_WATER }
+    { layer: 'background', color: COLOR_LAND },
+    { layer: 'water', color: COLOR_WATER },
+    { layer: 'waterway', color: COLOR_WATER }
   ];
-  roadGrey.forEach(function (r) { list.push({ layer: r, color: GREY_ROAD }); });
+  roadColor.forEach(function (r) { list.push({ layer: r, color: COLOR_ROAD }); });
   roadHide.forEach(function (r) { list.push({ layer: r, color: 'none' }); });
   var labels = ['highway_name_other', 'highway_name_motorway', 'water_name',
     'place_country_major', 'place_country_minor', 'place_country_other',
     'place_state', 'place_city', 'place_town', 'place_village', 'place_suburb',
     'place_other'];
   labels.forEach(function (l) {
-    list.push({ layer: l, color: showLabels ? GREY_LABEL : 'none' });
+    list.push({ layer: l, color: showLabels ? COLOR_LABEL : 'none' });
   });
   return list;
 }
 
 // Build the styleCustomization (array of {layer,color}) that paints each layer
-// group as one of the four canonical greys (and hides labels when names are
+// group as one of the four canonical colors (and hides labels when names are
 // off). Driven by the style's own layer list so it works for any layer ids.
 function buildStyleCustomization(layers, showLabels) {
   var out = [];
@@ -356,25 +350,25 @@ function buildStyleCustomization(layers, showLabels) {
     var isBoundary = /boundary|admin|border/i.test(sl);
 
     if (type === 'symbol') {
-      out.push({ layer: id, color: showLabels ? GREY_LABEL : 'none' });
+      out.push({ layer: id, color: showLabels ? COLOR_LABEL : 'none' });
     } else if (type === 'background') {
-      out.push({ layer: id, color: GREY_LAND });
+      out.push({ layer: id, color: COLOR_LAND });
     } else if (isWater) {
-      out.push({ layer: id, color: GREY_WATER });
+      out.push({ layer: id, color: COLOR_WATER });
     } else if (type === 'line') {
       // Major roads are a wide "casing" line under a narrower "inner" line. In
       // dark-matter the inner is BLACK (a zoom-stops expression that
       // styleCustomization cannot recolour), which punches a hole and makes the
       // road look hollow. So hide the inner lines and colour the casing (and
-      // simple single-line roads) the road grey -> a solid road surface.
+      // simple single-line roads) the road color -> a solid road surface.
       if (/casing/i.test(id)) {
-        out.push({ layer: id, color: GREY_ROAD });
+        out.push({ layer: id, color: COLOR_ROAD });
       } else if (/inner/i.test(id)) {
         out.push({ layer: id, color: 'none' });
       } else if (isBoundary) {
-        out.push({ layer: id, color: GREY_LAND });
+        out.push({ layer: id, color: COLOR_LAND });
       } else {
-        out.push({ layer: id, color: GREY_ROAD });
+        out.push({ layer: id, color: COLOR_ROAD });
       }
     }
     // Non-water fills (land, landuse, buildings) keep the dark style default,
@@ -389,7 +383,7 @@ function resolveStyleCustomization(settings, cb) {
   var showLabels = !!settings.SHOW_LABELS;
   var style = settings.MAP_STYLE || 'dark-matter';
   // The "v" version invalidates caches when the customization logic changes.
-  var cacheKey = 'stylecust:v4:' + style + ':' + (showLabels ? 1 : 0);
+  var cacheKey = 'stylecust:v6:' + style + ':' + (showLabels ? 1 : 0);
   var cached = localStorage.getItem(cacheKey);
   if (cached !== null) {
     try { cb(JSON.parse(cached)); return; } catch (e) { /* refetch */ }
@@ -438,7 +432,7 @@ function resolveStyleCustomization(settings, cb) {
 
 // Signature of the parameters that change the Geoapify SOURCE image.
 function fetchSignature(settings, size) {
-  return [settings.LOCATION_MODE, settings.MAP_STYLE, settings.ZOOM,
+  return ['v3', settings.LOCATION_MODE, settings.MAP_STYLE, settings.ZOOM,
           settings.SHOW_LABELS ? 1 : 0, size.w, size.h].join('|');
 }
 
@@ -522,13 +516,31 @@ function buildMapImage(arrayBuffer, render) {
   var px = new Uint8Array(UPNG.toRGBA8(decoded)[0]); // first frame, RGBA bytes
 
   for (var i = 0; i < px.length; i += 4) {
-    // Geoapify rendered each layer group as one of 4 greys; snap to the
-    // nearest level by perceptual luminance.
-    var lum = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8; // 0..255
-    var level = 0;
-    if (lum >= LEVEL_THRESHOLDS[2]) { level = 3; }
-    else if (lum >= LEVEL_THRESHOLDS[1]) { level = 2; }
-    else if (lum >= LEVEL_THRESHOLDS[0]) { level = 1; }
+    // Geoapify rendered each layer group as pure red, green, blue or black.
+    // Categorize the pixel based on its dominant channel.
+    var r = px[i], g = px[i + 1], b = px[i + 2];
+    var level = 0; // default to background (black)
+
+    var max = Math.max(r, g, b);
+    var min = Math.min(r, g, b);
+
+    // Filter out very dark anti-aliasing artifacts from being classified as a color
+    if (max >= 43) {
+      if (max - min < 20) {
+        // Pixel is greyscale (like anti-aliased label halos against background or other bright artifacts)
+        if (max > 128) {
+          level = 3; // bright greyscale -> labels
+        } else {
+          level = 0; // dark greyscale -> background
+        }
+      } else if (b === max) {
+        level = 3; // labels (blue)
+      } else if (g === max) {
+        level = 2; // roads (green)
+      } else if (r === max) {
+        level = 1; // water (red)
+      }
+    }
 
     if (render.bw) {
       var p = i >> 2;
