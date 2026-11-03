@@ -463,8 +463,9 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
   int block_w = graphics_text_layout_get_content_size(
       s_time_buf, time_font, measure, GTextOverflowModeFill,
       GTextAlignmentLeft).w;
+  int date_w = 0;
   if (s_show_date) {
-    int dw = graphics_text_layout_get_content_size(
+    int dw = date_w = graphics_text_layout_get_content_size(
         s_date_buf, date_font, measure, GTextOverflowModeFill,
         GTextAlignmentLeft).w;
     if (dw > block_w) { block_w = dw; }
@@ -499,16 +500,17 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
                         s_time_color, shadow, align);
 
   if (s_show_date) {
-    // A short accent divider between time and date. It follows the column
-    // alignment (starts at the left edge / centred / ends at the right edge of
-    // the text block), and never gets wider than the block itself.
+    // A short accent divider, centred on the date string (wherever the date
+    // sits for the chosen column) and never wider than the date itself, so it
+    // always stays inside the safe area.
     int divider_w = large ? 64 : 40;
-    if (divider_w > block_w) { divider_w = block_w; }
+    if (divider_w > date_w) { divider_w = date_w; }
     int thick = large ? 2 : 1;
     int divider_y = top + time_h + 2;
-    int dx = (col == 0) ? left
-           : (col == 1) ? (left + right - divider_w) / 2
-                        : right - divider_w;
+    int date_x = (col == 0) ? left
+               : (col == 1) ? (left + right - date_w) / 2
+                            : right - date_w;
+    int dx = date_x + (date_w - divider_w) / 2;
 
     graphics_context_set_stroke_color(ctx, shadow);
     graphics_draw_line(ctx, GPoint(dx, divider_y + thick),
