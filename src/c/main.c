@@ -26,6 +26,7 @@
 #define PERSIST_SHOW_STATUS     107
 #define PERSIST_TIME_FONT       108  // -1 = auto (platform default)
 #define PERSIST_DATE_FONT       109  // -1 = auto (platform default)
+#define PERSIST_TIME_POSITION   110  // 0..8, row-major 3x3 grid (4 = centre)
 
 // Defaults
 #define DEFAULT_TIME_COLOR      0xFFFFFF // white
@@ -36,6 +37,7 @@
 #define DEFAULT_SHOW_STATUS     true
 #define DEFAULT_TIME_FONT       (-1)     // -1 = auto: pick by screen size
 #define DEFAULT_DATE_FONT       (-1)     // -1 = auto: pick by screen size
+#define DEFAULT_TIME_POSITION   4        // centre of the 3x3 grid
 
 static Window *s_window;
 static Layer *s_canvas_layer;     // draws bg + map + center dot
@@ -66,6 +68,7 @@ static bool s_fixed_location = false; // no periodic refresh when fixed
 static bool s_show_status = DEFAULT_SHOW_STATUS;
 static int  s_time_font = DEFAULT_TIME_FONT;
 static int  s_date_font = DEFAULT_DATE_FONT;
+static int  s_time_pos  = DEFAULT_TIME_POSITION; // 0..8 = row * 3 + column
 
 // Custom font caches (NULL when a system font is selected).
 // Set by reload_custom_fonts(); freed in window_unload.
@@ -253,6 +256,41 @@ static void draw_text_with_shadow(GContext *ctx, const char *text, GFont font,
                      GTextOverflowModeTrailingEllipsis, align, NULL);
 }
 
+// ---------------------------------------------------------------------------
+// 3x3 grid layout helpers
+// ---------------------------------------------------------------------------
+
+#define EDGE_MARGIN_SMALL 4   // px kept clear of the screen edge (incl. 1px shadow)
+#define EDGE_MARGIN_LARGE 6
+
+// Horizontal span [*left, *right] that is guaranteed to be on screen for every
+// y in [y_top, y_bot], keeping `margin` px clear of the edge. On rectangular
+// screens that is simply the screen width; on round screens it is the chord of
+// the circle at the vertical extreme of the range that is farthest from the
+// centre, so text can never be cut off by the curved bezel.
+static void safe_span(GRect b, int y_top, int y_bot, int margin,
+                      int *left, int *right) {
+#if defined(PBL_ROUND)
+  int r = b.size.w / 2;
+  int cx = b.origin.x + r;
+  int cy = b.origin.y + b.size.h / 2;
+  int dy = abs(y_top - cy);
+  if (abs(y_bot - cy) > dy) { dy = abs(y_bot - cy); }
+  int v = r * r - dy * dy;
+  int half = 0;
+  if (v > 0) {
+    while ((half + 1) * (half + 1) <= v) { half++; }
+  }
+  *left = cx - half + margin;
+  *right = cx + half - margin;
+  if (*right < *left) { *left = *right = cx; }
+#else
+  (void)y_top; (void)y_bot;
+  *left = b.origin.x + margin;
+  *right = b.origin.x + b.size.w - margin;
+#endif
+}
+
 static void overlay_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
   GColor shadow = GColorBlack;
@@ -414,20 +452,63 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
       break;
   }
   int block_h = s_show_date ? (time_h + 6 + date_h) : time_h;
-  int top = bounds.origin.y + (bounds.size.h - block_h) / 2;
+  int margin = large ? EDGE_MARGIN_LARGE : EDGE_MARGIN_SMALL;
+
+  // Grid cell: row 0..2 (top/middle/bottom), col 0..2 (left/centre/right).
+  int row = s_time_pos / 3;
+  int col = s_time_pos % 3;
+
+  // Measure the real text widths so the block never exceeds the safe area.
+  GRect measure = GRect(0, 0, bounds.size.w, time_h * 2);
+  int block_w = graphics_text_layout_get_content_size(
+      s_time_buf, time_font, measure, GTextOverflowModeFill,
+      GTextAlignmentLeft).w;
+  if (s_show_date) {
+    int dw = graphics_text_layout_get_content_size(
+        s_date_buf, date_font, measure, GTextOverflowModeFill,
+        GTextAlignmentLeft).w;
+    if (dw > block_w) { block_w = dw; }
+  }
+
+  // Vertical placement: top / centre / bottom, inside the margin.
+  int top_min = bounds.origin.y + margin;
+  int top_max = bounds.origin.y + bounds.size.h - margin - block_h;
+  int top_mid = bounds.origin.y + (bounds.size.h - block_h) / 2;
+  if (top_max < top_min) { top_max = top_min; }
+  int top = (row == 0) ? top_min : (row == 2) ? top_max : top_mid;
+
+  // On round screens the corners are cut off: for the top/bottom rows slide the
+  // block toward the middle until the chord at its far edge is wide enough.
+  int left, right;
+  safe_span(bounds, top, top + block_h, margin, &left, &right);
+#if defined(PBL_ROUND)
+  while (row != 1 && (right - left) < block_w && top != top_mid) {
+    top += (row == 0) ? 1 : -1;
+    safe_span(bounds, top, top + block_h, margin, &left, &right);
+  }
+#endif
+
+  GTextAlignment align = (col == 0) ? GTextAlignmentLeft
+                       : (col == 1) ? GTextAlignmentCenter
+                                    : GTextAlignmentRight;
+  int span_w = right - left;
 
   // Time
-  GRect time_box = GRect(bounds.origin.x, top, bounds.size.w, time_h);
+  GRect time_box = GRect(left, top, span_w, time_h);
   draw_text_with_shadow(ctx, s_time_buf, time_font, time_box,
-                        s_time_color, shadow, GTextAlignmentCenter);
+                        s_time_color, shadow, align);
 
   if (s_show_date) {
-    // A short accent divider between time and date for a designed look. Wider
-    // and thicker on the large-font platforms (emery / gabbro) to match.
+    // A short accent divider between time and date. It follows the column
+    // alignment (starts at the left edge / centred / ends at the right edge of
+    // the text block), and never gets wider than the block itself.
     int divider_w = large ? 64 : 40;
+    if (divider_w > block_w) { divider_w = block_w; }
     int thick = large ? 2 : 1;
     int divider_y = top + time_h + 2;
-    int dx = bounds.origin.x + (bounds.size.w - divider_w) / 2;
+    int dx = (col == 0) ? left
+           : (col == 1) ? (left + right - divider_w) / 2
+                        : right - divider_w;
 
     graphics_context_set_stroke_color(ctx, shadow);
     graphics_draw_line(ctx, GPoint(dx, divider_y + thick),
@@ -439,17 +520,20 @@ static void overlay_update_proc(Layer *layer, GContext *ctx) {
     }
 
     // Date
-    GRect date_box = GRect(bounds.origin.x, divider_y + 4, bounds.size.w, date_h);
+    GRect date_box = GRect(left, divider_y + 4, span_w, date_h);
     draw_text_with_shadow(ctx, s_date_buf, date_font, date_box,
-                          s_date_color, shadow, GTextAlignmentCenter);
+                          s_date_color, shadow, align);
   }
 
-  // Status / debug line at the bottom (only when enabled and non-empty).
+  // Status / debug line. Normally at the bottom; when the time block sits in
+  // the bottom row it moves to the top so the two can never overlap.
   if (s_show_status && s_status[0] != '\0') {
     GFont status_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-    GRect status_box = GRect(bounds.origin.x + 4,
-                             bounds.origin.y + bounds.size.h - 22,
-                             bounds.size.w - 8, 18);
+    int sy = (row == 2) ? bounds.origin.y + 4
+                        : bounds.origin.y + bounds.size.h - 22;
+    int sl, sr;
+    safe_span(bounds, sy, sy + 18, 4, &sl, &sr);
+    GRect status_box = GRect(sl, sy, sr - sl, 18);
     draw_text_with_shadow(ctx, s_status, status_font, status_box,
                           GColorYellow, shadow, GTextAlignmentCenter);
   }
@@ -596,6 +680,14 @@ static void apply_config(DictionaryIterator *iter) {
     changed = true;
     fonts_changed = true;
   }
+  t = dict_find(iter, MESSAGE_KEY_TIME_POSITION);
+  if (t) {
+    int v = (t->type == TUPLE_CSTRING) ? atoi(t->value->cstring) : t->value->int32;
+    if (v < 0 || v > 8) { v = DEFAULT_TIME_POSITION; }
+    s_time_pos = v;
+    persist_write_int(PERSIST_TIME_POSITION, v);
+    changed = true;
+  }
   if (fonts_changed) {
     reload_custom_fonts();
   }
@@ -627,6 +719,9 @@ static void load_persisted_config(void) {
       ? persist_read_int(PERSIST_TIME_FONT) : DEFAULT_TIME_FONT;
   s_date_font = persist_exists(PERSIST_DATE_FONT)
       ? persist_read_int(PERSIST_DATE_FONT) : DEFAULT_DATE_FONT;
+  s_time_pos = persist_exists(PERSIST_TIME_POSITION)
+      ? persist_read_int(PERSIST_TIME_POSITION) : DEFAULT_TIME_POSITION;
+  if (s_time_pos < 0 || s_time_pos > 8) { s_time_pos = DEFAULT_TIME_POSITION; }
 }
 
 // ---------------------------------------------------------------------------

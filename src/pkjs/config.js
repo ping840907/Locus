@@ -275,6 +275,23 @@ module.exports = [
         "defaultValue": true
       },
       {
+        "type": "select",
+        "messageKey": "TIME_POSITION",
+        "label": "Time position",
+        "defaultValue": "4",
+        "options": [
+          { "label": "Top left",      "value": "0" },
+          { "label": "Top centre",    "value": "1" },
+          { "label": "Top right",     "value": "2" },
+          { "label": "Middle left",   "value": "3" },
+          { "label": "Centre",        "value": "4" },
+          { "label": "Middle right",  "value": "5" },
+          { "label": "Bottom left",   "value": "6" },
+          { "label": "Bottom centre", "value": "7" },
+          { "label": "Bottom right",  "value": "8" }
+        ]
+      },
+      {
         "type": "toggle",
         "messageKey": "SHOW_CENTER_DOT",
         "label": "Show location dot",
@@ -288,7 +305,7 @@ module.exports = [
       },
       {
         "type": "text",
-        "defaultValue": "Status messages appear at the bottom (e.g. Locating, Loading map). Turn off for a clean face."
+        "defaultValue": "Status messages appear at the bottom, or at the top when the time is in the bottom row (e.g. Locating, Loading map). Turn off for a clean face."
       }
     ]
   },

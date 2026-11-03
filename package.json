@@ -54,6 +54,7 @@
       "SHOW_STATUS",
       "TIME_FONT",
       "DATE_FONT",
+      "TIME_POSITION",
       "REQUEST_UPDATE",
       "STATUS",
       "IMG_SIZE",
